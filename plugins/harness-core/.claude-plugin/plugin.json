@@ -1,0 +1,6 @@
+{
+  "name": "harness-core",
+  "version": "0.1.0",
+  "description": "설계·작업·검증 기록 게이트와 안전장치 훅. 프로젝트별 값은 .claude/harness.json 이 답하고, 없는 절의 검사는 안 돈다.",
+  "author": { "name": "JungHwyKim", "email": "kkjjhh31@gmail.com" }
+}
