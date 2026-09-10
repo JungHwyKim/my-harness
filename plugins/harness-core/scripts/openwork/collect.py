@@ -134,21 +134,28 @@ NOT_A_SOURCE: dict[str, str] = {
 # **면제 목록이 없으면 경고가 상시가 되어 아무도 안 읽는다** — `NOT_A_SOURCE` ·
 # `auto_test_check.UNMAPPED_BY_DESIGN` 과 같은 역할이고, "빠뜨린 게 아님"을 사유와 함께
 # 적는 자리다. **여기 적힌 파일은 고치지 않기로 한 것이지 규약을 지킨 것이 아니다.**
-# 키는 파일 이름이다 — 폴더까지 적을 만큼 이름이 겹치지 않는다
-SECTIONLESS_BY_DESIGN: dict[str, str] = {
-    "phase1.md": "형식 규약(2026-08-17 .md 전환) 이전의 1단계 완료 보고문. 알맹이(OCR PSM 6 · "
-    "600px 임계값 · preserve_interword_spaces)는 loader/content/image_ocr.py 에 살아 있다",
-    "routing-diff-시행령개정안.md": "2026-08-14 실파일 라우팅 검증. 규약 이전이고 "
-    "성격은 verify_log 쪽이라 7절이 설 자리가 없다",
-    "2026-08-27-임베딩-지연-핸드오프.md": "다음 세션에 넘기는 핸드오프 형식이라 절 구성이 "
-    "다르다. 머리말이 스스로 «닫혔다 (2026-08-27)» 를 적어 뒀다",
-    "2026-09-01-위키-3계층-핸드오프.md": "같은 핸드오프 형식이라 7절이 「배경」이다. "
-    "남은 일은 3·4절(무엇을 어떻게 재나 · 판정 기준)에 있고, 기능 축의 미결은 "
-    "plan_log/문서-최신성.md 「미결」이 이미 갖는다 — 둘을 함께 세면 같은 일이 두 번 잡힌다",
-    "2026-09-03-함정전수-핸드오프.md": "바로 위와 같은 핸드오프 형식이고 같은 기능이다. "
-    "남은 일은 3·6절(어떻게 재나 · 판정이 성립하는가)에 있고, 기능 축의 미결은 "
-    "plan_log/문서-최신성.md 「미결」이 갖는다",
-}
+# 키는 파일 이름이다 — 폴더까지 적을 만큼 이름이 겹치지 않는다.
+#
+# **목록 자체는 여기 없다.** 어느 파일이 면제인지는 «그 저장소의 기록» 이라는 사실이고,
+# 저장소마다 다르다. 그래서 `.claude/harness.json` 의 `checks.openwork.sectionless_by_design`
+# 이 답한다(`경로: 이유` 사전이라 «빠뜨린 게 아님» 을 적는 자리가 그대로 산다).
+# 여기 남은 빈 사전은 테스트가 덮어쓰는 자리이고, 설정 위에 얹힌다
+SECTIONLESS_BY_DESIGN: dict[str, str] = {}
+
+
+# 설정이 준 면제 목록. 없거나 못 읽으면 빈 사전
+def _config_sectionless(root: Path) -> dict[str, str]:
+    try:
+        loaded = json.loads((root / ".claude" / "harness.json").read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {}
+    if not isinstance(loaded, dict):
+        return {}
+    section = loaded.get("checks", {}).get("openwork", {})
+    values = section.get("sectionless_by_design") if isinstance(section, dict) else None
+    if not isinstance(values, dict):
+        return {}
+    return {k: v for k, v in values.items() if isinstance(k, str)}
 
 _CLOSED = "~~"
 
@@ -426,6 +433,10 @@ def collect(root: Path | None = None) -> dict:
         if p.name != "INDEX.md"
     )
 
+    # 일부러 규약 밖인 파일. **어느 파일이 면제인지는 그 저장소의 사실이라 설정이 답한다.**
+    # 모듈 상수는 테스트가 덮어쓰는 자리로만 남았고, 설정 위에 얹힌다
+    exempt = {**_config_sectionless(root), **SECTIONLESS_BY_DESIGN}
+
     items: list[Item] = []
     stats: list[dict] = []
     for source in SOURCES:
@@ -446,14 +457,15 @@ def collect(root: Path | None = None) -> dict:
             closed_total += closed
             commit_state_total += commit_state
             with_section += int(had_section)
-            if not had_section and path.name not in SECTIONLESS_BY_DESIGN:
+            if not had_section and path.name not in exempt:
                 sectionless.append(path.name)
         if sectionless:
             warnings.append(
                 f"'{source.folder}/' 의 {len(sectionless)}개 파일에 '## {source.heading}' 절이 "
                 f"없습니다: {', '.join(sectionless)}. 절 번호가 밀렸으면 그 파일을 고치고, "
-                "일부러 규약 밖이면 openwork/collect.py 의 SECTIONLESS_BY_DESIGN 에 사유와 함께 "
-                "넣으세요 — 그러지 않으면 그 파일의 남은 일이 0건으로 조용히 빠집니다."
+                "일부러 규약 밖이면 .claude/harness.json 의 "
+                "checks.openwork.sectionless_by_design 에 사유와 함께 넣으세요 — "
+                "그러지 않으면 그 파일의 남은 일이 0건으로 조용히 빠집니다."
             )
         if with_section == 0:
             warnings.append(

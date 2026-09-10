@@ -27,10 +27,17 @@ HOOKS_DIR = REPO_ROOT / "plugins" / "harness-core" / "hooks"
 # 임시 저장소를 만들어 쓴다. 뜻이 바뀐 것을 이름으로 알리려 아래에서 REPO_ROOT 를 쓴다
 PROJECT_ROOT = REPO_ROOT
 
+# 스킬이 부르는 수집기들. 훅과 달리 **패키지**라 그 폴더가 아니라 부모를 얹는다
+SCRIPT_DIRS = (
+    REPO_ROOT / "plugins" / "harness-core" / "scripts",
+    REPO_ROOT / "plugins" / "quiz" / "scripts",
+)
+
 # 모듈 수준에서 얹는다. conftest 는 같은 폴더의 테스트 모듈보다 먼저 임포트되므로
 # 이 시점이면 테스트가 `import _hookutil` 하기 전이 보장된다
-if str(HOOKS_DIR) not in sys.path:
-    sys.path.insert(0, str(HOOKS_DIR))
+for _path in (HOOKS_DIR, *SCRIPT_DIRS):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 
 # 비어 있는 임시 git 저장소. `changed_paths()` 를 실제 git 으로 재기 위한 것이다.
