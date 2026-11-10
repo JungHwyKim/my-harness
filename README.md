@@ -8,9 +8,10 @@ Claude Code 프로젝트에 그대로 복사해 쓰는 개인용 개발 하네�
 
 새 프로젝트는 GitHub의 **Use this template**으로 시작한다.
 
-기존 프로젝트에 적용할 때는 이 저장소의 `CLAUDE.md`와 `.claude/`만 가져온다. 기존
-`CLAUDE.md`나 `.claude/settings.json`이 있다면 덮어쓰지 말고, 프로젝트의 규칙과
-`hooks` 항목을 병합한다.
+기존 프로젝트에 적용할 때는 이 저장소의 `CLAUDE.md`와 `.claude/`를 가져온다. Codex도
+함께 쓴다면 `AGENTS.md`도 가져온다. 기존 `CLAUDE.md`, `AGENTS.md`,
+`.claude/settings.json`이 있다면 덮어쓰지 말고, 프로젝트의 규칙과 `hooks` 항목을
+병합한다.
 
 적용 직후에는 아래 네 곳을 프로젝트에 맞게 수정한다.
 
@@ -22,9 +23,20 @@ Claude Code 프로젝트에 그대로 복사해 쓰는 개인용 개발 하네�
 Claude Code는 프로젝트의 `.claude/settings.json`에서 훅을,
 `.claude/skills/<이름>/SKILL.md`에서 프로젝트 스킬을 읽는다.
 
+## Codex와 함께 사용
+
+`AGENTS.md`는 Codex의 진입점이다. 이 파일은 `CLAUDE.md`를 공통 규칙의 원본으로
+참조하고, Wiki·Skill·Quality Gate를 언제 확인해야 하는지만 안내한다. 따라서 두 에이전트에
+같은 긴 규칙을 복사할 필요가 없다.
+
+Codex에서는 `.claude/settings.json`의 Claude Code 훅이 자동으로 실행되지 않는다. 코드나
+하네스 설정을 바꾼 뒤에는 `AGENTS.md`의 안내에 따라 `.claude/harness.json`의 Fast 또는
+Full Quality Profile을 직접 실행한다.
+
 ## 구조
 
 ```text
+AGENTS.md                Codex용 최소 규칙과 Context Router
 CLAUDE.md                최소 공통 규칙과 Context Router
 .claude/settings.json    프로젝트 공용 훅 설정
 .claude/harness.json     프로젝트별 품질·History 설정
