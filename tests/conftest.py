@@ -18,10 +18,10 @@ from pathlib import Path
 import pytest
 from _escape_hatches import ESCAPE_HATCHES
 
-# tests/conftest.py -> 플러그인 저장소 뿌리
+# tests/conftest.py -> 복사형 하네스 저장소 뿌리
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-HOOKS_DIR = REPO_ROOT / "plugins" / "harness-core" / "hooks"
+HOOKS_DIR = REPO_ROOT / ".claude" / "hooks"
 
 # 옛 이름. 이 저장소에는 «프로젝트» 가 없고 플러그인만 있는데, 테스트 여럿이 이 이름으로
 # 임시 저장소를 만들어 쓴다. 뜻이 바뀐 것을 이름으로 알리려 아래에서 REPO_ROOT 를 쓴다
@@ -29,8 +29,7 @@ PROJECT_ROOT = REPO_ROOT
 
 # 스킬이 부르는 수집기들. 훅과 달리 **패키지**라 그 폴더가 아니라 부모를 얹는다
 SCRIPT_DIRS = (
-    REPO_ROOT / "plugins" / "harness-core" / "scripts",
-    REPO_ROOT / "plugins" / "quiz" / "scripts",
+    REPO_ROOT / ".claude" / "scripts",
 )
 
 # 모듈 수준에서 얹는다. conftest 는 같은 폴더의 테스트 모듈보다 먼저 임포트되므로

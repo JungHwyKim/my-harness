@@ -1,54 +1,52 @@
-# my-harness
+# my-harness V1
 
-개인용 Claude Code 하네스. **비공개 마켓플레이스 하나에 플러그인 셋**이 들어 있다.
+Claude Code 프로젝트에 그대로 복사해 쓰는 V1 개발 하네스다. 플러그인 마켓플레이스와
+별도 설치는 사용하지 않는다.
 
-`agentic-rag-proj` 안에서 자란 것을 2026-09-10 에 뽑아냈다. 뽑은 이유는 사본을 늘리는
-방식이 이미 갈렸기 때문이다 — 같은 하네스의 Codex 사본(`.codex/hooks/`)이 7개 중 5개가
-달랐고 둘은 아예 없었다.
-
-| 플러그인 | 무엇이 들었나 | 언제 켜나 |
-|---|---|---|
-| `harness-core` | 훅 9개 + 기록 스킬 4(plan-log·task-log·verify-log·plan-interview) + 도구 스킬 2(openwork·code-tracker) | 어느 프로젝트에서나 |
-| `harness-rag` | rag-code-review·document-ingestion·regression-test 스킬 + 에이전트 4 | `rag_pipeline/` 같은 구조가 실재하는 저장소에서만 |
-| `quiz` | 면접 노트 연습 도구 | 저장소와 무관 (노트 폴더를 읽는다) |
-
-## 프로젝트마다 갈리는 값은 `.claude/harness.json` 이 답한다
-
-훅에는 저장소 이름이 하나도 안 박혀 있다. 테스트 매핑표·소스 접두사·위키 뿌리·린트와
-테스트 명령을 프로젝트가 자기 `.claude/harness.json` 으로 준다.
-
-**절이 없으면 그 검사는 안 돈다.** 기본값으로 조용히 도는 쪽이 더 나쁘다 — 남의 저장소
-경로로 pytest 를 돌리거나, 반대로 *검사가 도는 줄 알았는데 안 도는* 상태가 아무 에러 없이
-생긴다. 본보기는 `agentic-rag-proj/.claude/harness.json` 이다.
-
-## 설치
-
-```bash
-claude plugin marketplace add <이 저장소 경로 또는 GitHub 주소>
-claude plugin install harness-core@junghwy-harness --scope project
+```text
+CLAUDE.md             최소 공통 규칙과 문서 탐색 경로
+.claude/settings.json 프로젝트 공용 훅 설정
+.claude/harness.json  프로젝트별 검사·경로 설정
+.claude/hooks/        Hook 구현
+.claude/scripts/      openwork·quiz 보조 스크립트
+.claude/skills/       필요할 때 로드되는 작업 절차
+.claude/agents/       RAG 프로젝트용 담당 에이전트
+.claude/wiki/         Overview · Knowledge · V1 기록 로그
 ```
 
-`--scope project` 면 **어느 프로젝트가 무엇을 켰는지가 그 프로젝트 설정에 글로 남는다.**
-개발 중에는 설치 없이 `claude --plugin-dir <플러그인 경로>` 로 띄운다.
+## 적용
 
-## 고칠 때
+새 프로젝트는 GitHub의 **Use this template**으로 시작한다.
 
-훅을 고치면 **여기 pytest 를 돌린다.** 그 보장이 이 저장소로 함께 옮겨 왔다 —
-프로젝트 쪽 pytest 는 더 이상 훅을 안 지킨다.
+기존 프로젝트에 적용할 때는 이 저장소의 `CLAUDE.md`와 `.claude/`를 가져온다. 기존
+`CLAUDE.md`나 `.claude/settings.json`이 있으면 덮어쓰지 말고 규칙과 `hooks` 항목을
+병합한다.
 
-```bash
+적용한 뒤에는 아래 내용을 프로젝트에 맞게 수정한다.
+
+1. `CLAUDE.md`의 프로젝트 목적과 공통 규칙
+2. `.claude/harness.json`의 Python 경로, 소스 경로, 테스트 매핑, 커밋 전 검사 명령
+3. `.claude/wiki/overview/`, `knowledge/`의 프로젝트 문서
+
+Claude Code는 프로젝트의 `.claude/settings.json`과 `.claude/skills/`를 바로 읽으므로,
+별도의 플러그인 설치 없이 훅과 스킬이 동작한다.
+
+## V1 기록 흐름
+
+```text
+설계 논의          → wiki/plan_log/
+구현 중 결정·실패  → wiki/task_log/
+검증 수치          → wiki/verify_log/
+```
+
+V1은 설계·작업 기록 게이트를 통해 기록 누락을 막는다. Git은 변경 사실을, 테스트는 현재
+동작을, Wiki는 설계·구현 과정의 맥락을 보존한다.
+
+## 검증
+
+```powershell
 python -m pytest tests -q
-claude plugin validate ./plugins/harness-core --strict
 ```
 
-프로젝트 쪽에 남은 검사는 **설정이 그 저장소와 맞나** 하나다
-(`agentic-rag-proj/tests/harness/test_harness_config.py`).
-
-## 알아 둘 것
-
-- **`CLAUDE_PROJECT_DIR` 는 저장소 뿌리가 아니라 세션을 띄운 폴더다**(실측). 뿌리는 거기서
-  `.claude/` 를 가진 폴더까지 올라가 찾는다 — `_hookutil._find_root()`
-- **git 을 뿌리 표시로 안 쓴다.** `.git` 이 없는 프로젝트가 실재한다
-- **세션 마커는 `CLAUDE_PLUGIN_DATA` 아래**에 산다. 프로젝트를 안 더럽히고 git 여부를 안 탄다
-- 훅 9개는 전부 표준 라이브러리만 쓴다. 프로젝트 venv 는 훅이 **부르는** pytest·ruff 에만 필요하고
-  그 경로는 `harness.json` 의 `python` 이 준다
+훅은 표준 라이브러리만 사용한다. 실제 프로젝트의 pytest·ruff·빌드 명령은
+`.claude/harness.json`에 정의한다.

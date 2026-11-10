@@ -29,7 +29,7 @@ import pytest
 HOOK_PATH = Path(hook.__file__)
 # tests/ -> 플러그인 저장소 뿌리. 훅은 플러그인 안에 산다
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HOOKS_DIR = REPO_ROOT / "plugins" / "harness-core" / "hooks"
+HOOKS_DIR = REPO_ROOT / ".claude" / "hooks"
 
 # 아래 픽스처가 임시 프로젝트로 갈아끼운다
 PROJECT_ROOT = REPO_ROOT

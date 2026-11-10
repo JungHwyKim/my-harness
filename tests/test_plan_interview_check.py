@@ -32,7 +32,7 @@ SESSION = "sess-plan-interview"
 # tests/ -> 플러그인 저장소 뿌리. 훅은 플러그인 안에 산다
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = REPO_ROOT
-HOOKS_DIR = REPO_ROOT / "plugins" / "harness-core" / "hooks"
+HOOKS_DIR = REPO_ROOT / ".claude" / "hooks"
 HOOK = HOOKS_DIR / "plan_interview_check.py"
 
 

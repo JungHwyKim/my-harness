@@ -1,0 +1,23 @@
+{
+  "python": ".venv/Scripts/python.exe",
+  "wiki_root": ".claude/wiki/",
+  "source_prefixes": ["src/", "tests/"],
+  "harness_paths": [".claude/settings.json", ".claude/harness.json"],
+  "checks": {
+    "auto_test": {
+      "mappings": [],
+      "unmapped_by_design": {}
+    },
+    "pre_commit": {
+      "lint": [],
+      "build": [],
+      "import_check": [],
+      "test": []
+    },
+    "expensive_tests": {
+      "pytest_markers": ["integration"],
+      "reason": "외부 API 호출 또는 긴 실행 시간이 드는 테스트입니다.",
+      "allow_env": "ALLOW_PAID_TESTS"
+    }
+  }
+}

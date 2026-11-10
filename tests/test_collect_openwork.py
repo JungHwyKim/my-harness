@@ -23,7 +23,7 @@ from openwork import collect as oc
 
 # `python -m openwork.collect` 이 패키지를 찾는 자리. 아래 CLI 테스트의 `cwd` 로만 쓴다 —
 # 훑을 기록은 늘 `--root` 로 따로 준다
-PROJECT_ROOT = Path(__file__).resolve().parents[1] / "plugins" / "harness-core" / "scripts"
+PROJECT_ROOT = Path(__file__).resolve().parents[1] / ".claude" / "scripts"
 
 
 # 기록 폴더가 실제로 앉는 자리를 **수집기 상수에서 받는다.**

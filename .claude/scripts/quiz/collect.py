@@ -43,7 +43,19 @@ import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+def _project_root() -> Path:
+    raw = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    try:
+        start = Path(raw).resolve()
+    except OSError:
+        return Path.cwd()
+    for candidate in (start, *start.parents):
+        if (candidate / ".claude").is_dir():
+            return candidate
+    return start
+
+
+PROJECT_ROOT = _project_root()
 
 # 노트 폴더. **절대 경로를 코드에 안 박는다** — 커밋되는 파일이라 남의 머신에서 곧바로
 # 거짓이 되고, CLAUDE.md 가 「설정 지문에 머신의 파일 배치가 샜다」로 이미 짚은 함정이다

@@ -6,17 +6,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/paid_test_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/paid_test_check.py\"",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/heredoc_write_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/heredoc_write_check.py\"",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/pre_commit_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/pre_commit_check.py\"",
             "timeout": 900,
             "statusMessage": "커밋 전 린트·빌드·테스트 실행 중..."
           }
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/plan_interview_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_interview_check.py\"",
             "timeout": 15
           }
         ]
@@ -38,12 +38,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/plan_log_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_log_check.py\"",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/plan_interview_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_interview_check.py\"",
             "timeout": 15
           }
         ]
@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/plan_log_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_log_check.py\"",
             "timeout": 15
           }
         ]
@@ -65,22 +65,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/task_log_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/task_log_check.py\"",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/prose_style_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/prose_style_check.py\"",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/plan_log_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_log_check.py\"",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/auto_test_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/auto_test_check.py\"",
             "timeout": 120,
             "statusMessage": "고친 곳의 테스트 실행 중..."
           }
@@ -91,7 +91,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/auto_test_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/auto_test_check.py\"",
             "timeout": 120,
             "statusMessage": "고친 곳의 테스트 실행 중..."
           }
@@ -102,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/plan_interview_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_interview_check.py\"",
             "timeout": 15
           }
         ]
@@ -113,19 +113,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/auto_test_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/auto_test_check.py\"",
             "timeout": 600,
             "statusMessage": "전체 테스트 확인 중..."
           },
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/task_log_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/task_log_check.py\"",
             "timeout": 30,
             "statusMessage": "작업 기록 확인 중..."
           },
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/plan_log_check.py\"",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_log_check.py\"",
             "timeout": 30,
             "statusMessage": "설계 논의 기록 확인 중..."
           }
