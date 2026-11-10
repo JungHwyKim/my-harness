@@ -25,7 +25,7 @@ import pytest
 
 # tests/ -> 플러그인 저장소 뿌리. 훅은 플러그인 안에 산다
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HOOKS_DIR = REPO_ROOT / "plugins" / "harness-core" / "hooks"
+HOOKS_DIR = REPO_ROOT / ".claude" / "harness" / "hooks"
 
 # 아래 픽스처가 임시 프로젝트로 갈아끼운다
 PROJECT_ROOT = REPO_ROOT
@@ -299,3 +299,44 @@ def test_write_edit_still_uses_file_path(tmp_path, monkeypatch) -> None:
     assert auto_test_check._targets_for_call(payload, "sess-write") == [
         auto_test_check.test_target_for("rag_pipeline/ingestion/cleaner/characters.py")
     ]
+
+
+# ---- schema_version 2: 언어에 종속되지 않는 Quality Gate ----
+
+
+V2_QUALITY_CONFIG = {
+    "schema_version": 2,
+    "wiki_root": ".claude/wiki/",
+    "source_prefixes": ["src/"],
+    "history": {
+        "plan": "history/plan/",
+        "task": "history/task/",
+        "verify": "history/verify/",
+        "tracked_paths": ["src/"],
+    },
+    "quality": {
+        "tracked_paths": ["src/", ".claude/harness.json"],
+        "mappings": [{"path": "src/", "tests": "tests/"}],
+        "profiles": {"fast": {"stages": []}, "full": {"stages": []}},
+    },
+}
+
+
+def test_v2_mapping_accepts_non_python_sources(load_hook) -> None:
+    module, _ = load_hook("auto_test_check", V2_QUALITY_CONFIG)
+
+    assert module.test_target_for("src/app.ts") == "tests/"
+
+
+def test_v2_direct_change_uses_quality_tracked_paths(load_hook) -> None:
+    module, _ = load_hook("auto_test_check", V2_QUALITY_CONFIG)
+    payload = {"tool_input": {"file_path": ".claude/harness.json"}}
+
+    assert module._changed_files_for_call(payload, "v2-direct") == [".claude/harness.json"]
+
+
+def test_v2_ignores_direct_change_outside_quality_scope(load_hook) -> None:
+    module, _ = load_hook("auto_test_check", V2_QUALITY_CONFIG)
+    payload = {"tool_input": {"file_path": "docs/notes.md"}}
+
+    assert module._changed_files_for_call(payload, "v2-outside") == []

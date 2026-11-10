@@ -29,7 +29,7 @@ import pytest
 HOOK_PATH = Path(hook.__file__)
 # tests/ -> 플러그인 저장소 뿌리. 훅은 플러그인 안에 산다
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HOOKS_DIR = REPO_ROOT / "plugins" / "harness-core" / "hooks"
+HOOKS_DIR = REPO_ROOT / ".claude" / "harness" / "hooks"
 
 # 아래 픽스처가 임시 프로젝트로 갈아끼운다
 PROJECT_ROOT = REPO_ROOT
@@ -248,6 +248,7 @@ def _run(file_path: str, content: str = "", *, env: dict[str, str] | None = None
         capture_output=True,
         timeout=30,
         env=env,
+        check=False,
     )
 
 
@@ -298,6 +299,7 @@ def test_broken_payload_is_silent() -> None:
         input=b"not json",
         capture_output=True,
         timeout=30,
+        check=False,
     )
 
     assert proc.returncode == 0
@@ -319,4 +321,4 @@ def test_the_report_points_at_the_rule() -> None:
 
     assert "CLAUDE.md" in line
     assert "낱말 판 3" in line
-    assert "기록-형식.md" in line
+    assert "checks.prose_style" in line

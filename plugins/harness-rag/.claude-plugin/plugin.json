@@ -1,6 +1,0 @@
-{
-  "name": "harness-rag",
-  "version": "0.1.0",
-  "description": "RAG 적재·검색 저장소를 위한 리뷰·실측·회귀 스킬과 담당 에이전트.",
-  "author": { "name": "JungHwyKim", "email": "kkjjhh31@gmail.com" }
-}

@@ -18,12 +18,11 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from openwork import collect as oc
 
 # `python -m openwork.collect` 이 패키지를 찾는 자리. 아래 CLI 테스트의 `cwd` 로만 쓴다 —
 # 훑을 기록은 늘 `--root` 로 따로 준다
-PROJECT_ROOT = Path(__file__).resolve().parents[1] / "plugins" / "harness-core" / "scripts"
+PROJECT_ROOT = Path(__file__).resolve().parents[1] / ".claude" / "harness" / "scripts"
 
 
 # 기록 폴더가 실제로 앉는 자리를 **수집기 상수에서 받는다.**
@@ -115,6 +114,95 @@ def test_open_items_are_not_second_guessed(fake_repo: Path) -> None:
     whats = [i["what"] for i in result["items"]]
     assert "임계값을 정한다" in whats
     assert "캐시를 안 붙였다" in whats
+
+
+def test_v2_without_sources_is_explicitly_disabled(tmp_path: Path) -> None:
+    wiki = tmp_path / ".claude" / "wiki"
+    wiki.mkdir(parents=True)
+    (tmp_path / ".claude" / "harness.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "wiki_root": ".claude/wiki/",
+                "checks": {"openwork": {"sources": []}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = oc.collect(tmp_path)
+
+    assert result["items"] == []
+    assert result["sources"] == []
+    assert any("정보원이 설정되지 않았습니다" in warning for warning in result["warnings"])
+
+
+def test_v2_uses_project_defined_source_instead_of_history(tmp_path: Path) -> None:
+    wiki = tmp_path / ".claude" / "wiki"
+    backlog = wiki / "backlog"
+    backlog.mkdir(parents=True)
+    (tmp_path / ".claude" / "harness.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "wiki_root": ".claude/wiki/",
+                "checks": {
+                    "openwork": {
+                        "sources": [
+                            {
+                                "folder": "backlog",
+                                "heading": "Open",
+                                "kind": "decision",
+                                "file_is_feature": True,
+                            }
+                        ]
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (backlog / "search.md").write_text(
+        "# Search\n\n## Open\n\n- **Choose cache policy** — needs production measurements\n",
+        encoding="utf-8",
+    )
+
+    result = oc.collect(tmp_path)
+
+    assert [item["what"] for item in result["items"]] == ["Choose cache policy"]
+    assert result["items"][0]["group"] == "search"
+
+
+def test_v2_root_argument_uses_that_projects_wiki_root(tmp_path: Path) -> None:
+    backlog = tmp_path / "docs" / "context" / "backlog"
+    backlog.mkdir(parents=True)
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "harness.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "wiki_root": "docs/context/",
+                "checks": {
+                    "openwork": {
+                        "sources": [
+                            {
+                                "folder": "backlog",
+                                "heading": "Open",
+                                "kind": "decision",
+                                "file_is_feature": True,
+                            }
+                        ]
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (backlog / "build.md").write_text("## Open\n\n- **Choose builder** — compare outputs\n", encoding="utf-8")
+
+    result = oc.collect(tmp_path)
+
+    assert [item["what"] for item in result["items"]] == ["Choose builder"]
 
 
 # ---- 커밋 상태 ----

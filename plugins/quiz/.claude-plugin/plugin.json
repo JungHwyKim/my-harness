@@ -1,6 +1,0 @@
-{
-  "name": "quiz",
-  "version": "0.1.0",
-  "description": "면접 노트를 한 문제씩 내고 모범답안과 대조해 주는 연습 도구.",
-  "author": { "name": "JungHwyKim", "email": "kkjjhh31@gmail.com" }
-}

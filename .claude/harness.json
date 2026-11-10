@@ -1,0 +1,68 @@
+{
+  "schema_version": 2,
+  "wiki_root": ".claude/wiki/",
+  "python": ".venv/Scripts/python.exe",
+  "source_prefixes": ["src/", "tests/"],
+  "harness_paths": [".claude/harness.json", ".claude/settings.json"],
+  "history": {
+    "plan": "history/plan/",
+    "task": "history/task/",
+    "verify": "history/verify/",
+    "tracked_paths": ["src/", "tests/", "pyproject.toml", ".claude/harness.json"]
+  },
+  "quality": {
+    "tracked_paths": ["src/", "tests/", "pyproject.toml", ".claude/harness.json"],
+    "mappings": [
+      {
+        "path": "src/",
+        "tests": "tests/",
+        "why": "제품 코드 변경에는 전체 단위 테스트가 대응한다"
+      }
+    ],
+    "unmapped_by_design": {},
+    "profiles": {
+      "fast": {
+        "triggers": ["post_change"],
+        "stages": [
+          {
+            "id": "test",
+            "label": "영향 범위 테스트",
+            "argv": ["{python}", "-m", "pytest", "{mapped_targets}", "-q"],
+            "timeout": 90,
+            "success_codes": [0, 5]
+          }
+        ]
+      },
+      "full": {
+        "triggers": ["stop", "pre_commit"],
+        "stages": [
+          {
+            "id": "lint",
+            "argv": ["{python}", "-m", "ruff", "check", "."],
+            "timeout": 120
+          },
+          {
+            "id": "format",
+            "argv": ["{python}", "-m", "ruff", "format", "--check", "."],
+            "timeout": 120
+          },
+          {
+            "id": "test",
+            "argv": ["{python}", "-m", "pytest", "-q"],
+            "timeout": 600
+          }
+        ]
+      }
+    }
+  },
+  "checks": {
+    "openwork": {
+      "sources": []
+    },
+    "expensive_tests": {
+      "pytest_markers": [],
+      "reason": "이 프로젝트가 지정한 expensive test는 비용 또는 긴 실행 시간이 발생합니다.",
+      "allow_env": "ALLOW_PAID_TESTS"
+    }
+  }
+}

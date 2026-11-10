@@ -19,22 +19,21 @@ from pathlib import Path
 import pytest
 from _escape_hatches import ESCAPE_HATCHES
 
-# tests/test_hook_wiring.py -> 플러그인 저장소 뿌리
+# tests/test_hook_wiring.py -> 하네스 저장소 뿌리
 #
-# **배선이 사는 자리가 바뀌었다.** 한때 프로젝트 `.claude/settings.json` 이었고 지금은
-# 플러그인 `hooks/hooks.json` 이다. 이 파일이 지키는 것은 그대로다 — 배선이 끊기면 훅은
-# 한 번도 안 도는데 아무 에러도 안 난다
+# 배선은 프로젝트 공유 설정인 `.claude/settings.json` 에 둔다. 이 파일이 지키는 것은
+# 그대로다 — 배선이 끊기면 훅은 한 번도 안 도는데 아무 에러도 안 난다.
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PLUGIN_ROOT = REPO_ROOT / "plugins" / "harness-core"
-HOOKS_DIR = PLUGIN_ROOT / "hooks"
-SETTINGS = HOOKS_DIR / "hooks.json"
+HARNESS_ROOT = REPO_ROOT / ".claude" / "harness"
+HOOKS_DIR = HARNESS_ROOT / "hooks"
+SETTINGS = REPO_ROOT / ".claude" / "settings.json"
 
-# hooks.json 의 command 문자열에서 훅 스크립트 이름을 뽑는다.
-# 명령은 `python "${CLAUDE_PLUGIN_ROOT}/hooks/X.py"` 모양이다
+# settings.json 의 command 문자열에서 훅 스크립트 이름을 뽑는다.
+# 명령은 `python "${CLAUDE_PROJECT_DIR}/.claude/harness/hooks/X.py"` 모양이다.
 _SCRIPT_RE = re.compile(r"hooks/([\w.]+\.py)")
 
 # 다른 훅이 임포트해 쓰는 공용 모듈. 단독 실행되지 않으므로 배선 대상이 아니다
-LIBRARY_MODULES = {"_hookutil.py"}
+LIBRARY_MODULES = {"_hookutil.py", "_quality.py"}
 
 # 셸 명령을 검사하지 **않는** PreToolUse 훅. 아래 test_pretooluse_covers_both_shells 의 예외다.
 #

@@ -82,6 +82,7 @@ def _run_hook(command: str, *, raw: bytes | None = None, env: dict | None = None
         capture_output=True,
         timeout=30,
         env=env,
+        check=False,
     )
 
 
@@ -126,3 +127,46 @@ def test_unreadable_input_does_not_block():
     proc = _run_hook("", raw=b"not json at all")
     assert proc.returncode == 0
     assert proc.stdout.strip() == b""
+
+
+def test_v2_marker_policy_is_project_defined(load_hook):
+    config = {
+        "schema_version": 2,
+        "wiki_root": ".claude/wiki/",
+        "history": {
+            "plan": "history/plan/",
+            "task": "history/task/",
+            "verify": "history/verify/",
+            "tracked_paths": ["src/"],
+        },
+        "quality": {"profiles": {}},
+        "checks": {
+            "expensive_tests": {
+                "pytest_markers": ["paid"],
+                "reason": "실제 비용이 발생한다",
+            }
+        },
+    }
+    module, _ = load_hook("paid_test_check", config)
+
+    assert module.blocked_reason("pytest -m paid") is not None
+    assert module.blocked_reason("pytest -m integration") is None
+    assert module.blocked_reason("pytest -m 'not paid'") is None
+
+
+def test_v2_without_markers_disables_expensive_guard(load_hook):
+    config = {
+        "schema_version": 2,
+        "wiki_root": ".claude/wiki/",
+        "history": {
+            "plan": "history/plan/",
+            "task": "history/task/",
+            "verify": "history/verify/",
+            "tracked_paths": ["src/"],
+        },
+        "quality": {"profiles": {}},
+        "checks": {"expensive_tests": {"pytest_markers": []}},
+    }
+    module, _ = load_hook("paid_test_check", config)
+
+    assert module.blocked_reason("pytest -m integration") is None
