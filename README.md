@@ -6,7 +6,6 @@ Claude Code 프로젝트에 그대로 복사해 쓰는 개인용 개발 하네�
 
 ## 빠른 시작
 
-작업하는 workspace에서 다음 코드 입력:
 ```powershell
 git clone https://github.com/JungHwyKim/my-harness <your_dir>
 ```
