@@ -6,7 +6,10 @@ Claude Code 프로젝트에 그대로 복사해 쓰는 개인용 개발 하네�
 
 ## 빠른 시작
 
-새 프로젝트는 GitHub의 **Use this template**으로 시작한다.
+작업하는 workspace에서 다음 코드 입력:
+```powershell
+git clone https://github.com/JungHwyKim/my-harness <your_dir>
+```
 
 기존 프로젝트에 적용할 때는 이 저장소의 `CLAUDE.md`와 `.claude/`를 가져온다. Codex도
 함께 쓴다면 `AGENTS.md`도 가져온다. 기존 `CLAUDE.md`, `AGENTS.md`,
