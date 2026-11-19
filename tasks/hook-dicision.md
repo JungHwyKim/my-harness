@@ -1,10 +1,10 @@
 # 유료 테스트 승인 훅 설계
 
 - 작업 ID: `hook-dicision` — 기존 인수인계 경로를 유지한다.
-- 상태: Round 5 코드·자동 검증 완료 · README 계약 정합성 반영 · 추가 승인창 실측 대기
+- 상태: Round 9 코드·자동 검증 확인 · Knowledge의 오탐 범위 정정 및 보존 대기
 - 명세: `tasks/hook-dicision.md`
 - 리뷰·구현 보고: `tasks/hook-dicision.review.md`
-- 기준: `release/v2`, HEAD `4f5300c`와 기존 미커밋 변경. 인수 시 다시 확인한다.
+- 기준: `release/v2`, HEAD `d413f3b`와 기존 미커밋 변경. 인수 시 다시 확인한다.
 
 ## 목적과 실행 계약
 
@@ -98,8 +98,31 @@ PowerShell에서 공백이 있는 경로를 따옴표로 감싼 Python 실행기
 | -m not paid and not paid2 | 설정된 두 마커가 모두 제외되면 승인 불필요 |
 | 괄호·중복 옵션·복합식의 안전성을 해석하지 못함 | 승인 필요로 보수적으로 판정 |
 | pytest -q처럼 제외를 덮지 않는 호출 | 적용 안내의 기본 제외를 전제로 통과 |
-| --collect-only | pytest의 독립된 실제 옵션일 때만 수집 전용 예외. 셸 주석·인용 문자열·`./--collect-only` 같은 경로의 일부는 예외가 아님. 임시 검증 프로젝트의 import·플러그인도 외부 호출이 없어야 함 |
+| --collect-only | 수집 전용 예외 없음. 원문에서 유료 마커를 고르거나 기본 제외를 덮는 명령이면 승인 필요. 안전한 일반 pytest 호출은 통과 |
+| Bash의 `\"` 이스케이프가 있는 인용 문자열 | 실제 옵션 여부를 따로 해석하지 않는다. 원문에 기본 제외를 보장하지 못하는 `-m`이 보이면 승인 필요 |
+| `#`이 든 pytest 명령 | CDEX-08 이후의 설계 결정: 비용 훅은 셸 주석을 판별하거나 제거하지 않는다. 원문에 위험 옵션이 보이면 승인 필요. 진짜 주석의 위험 옵션 때문에 추가 승인창이 뜰 수 있다 |
 | pytest가 아닌 명령 | 비용 훅은 관여하지 않음 |
+
+### Round 8 설계 결정 — 주석 제거 로직 폐기
+
+수집 전용 예외를 없앤 뒤에도 CDEX-08은 `_strip_comment()`의 셸 해석만으로 승인 없이
+유료 본문을 실행했다. PowerShell과 Bash의 주석 경계를 명령 문자열에서 완전히 증명하려는
+규칙은 더 유지하지 않는다. `_paid_reason()`에 원문을 넘기고, 다른 용도가 없다면
+`_strip_comment()`·`_walk()`·`_escapes_next()`를 함께 제거한다. 이 결정은 현재의
+Round 8 좁은 수정 위에 패치를 더 쌓지 않고 위험한 전처리 단계를 걷어내는 것이다.
+
+`pytest -q # -m paid`처럼 진짜 주석에 위험 옵션이 적힌 호출은 이제 `ask`가 된다.
+`pytest -q # -m unit`, `pytest -q # -c other.ini`, `pytest -q # -o addopts=`도
+기본 제외를 덮을 수 있는 글자가 원문에 있어 추가 승인을 요구한다.
+한 번 더 묻는 비용을 수용한다. `pytest -q`, 모든 유료 마커를 제외한 호출, pytest가
+아닌 명령은 기존처럼 통과해야 한다. PowerShell·Bash의 CDEX-08 명령은 계속 `ask`여야
+한다. 이 계약을 회귀 테스트에 반영하고 무과금 임시 프로젝트에서 훅 판정과 실제 셸 실행을
+확인한다. Knowledge에는 승인 범위와 이 오탐 가능성을 현재 계약으로 남긴다.
+
+이후 검증은 지원한다고 문서화한 직접 pytest 호출과 이미 재현한 우회, 전체 품질 검사에
+한정한다. 임의의 셸 문법 전체를 지원한다고 주장하지 않는다. 이 범위에서 막는 지적이
+없으면 최종 리뷰를 끝내고 보존·정리 단계로 간다. 새로운 셸 문법을 끝없이 열거하며
+리뷰 회차를 늘리지 않는다.
 
 모든 마커 제외를 보장하는 단순 AND 식만 무료로 인정한다. not paid라는 부분 문자열만으로
 허용하지 않는다. 옵션 반복으로 앞선 제외가 무력화되는 경우도 검사한다. 문자열 eval은 쓰지 않는다.
@@ -138,6 +161,23 @@ PowerShell에서 공백이 있는 경로를 따옴표로 감싼 Python 실행기
   검증한다. PowerShell의 백틱으로 따옴표를 이스케이프한
   ``pytest -m paid -q -o "junit_suite_name=x`"--collect-only"``도 실제 수집 옵션이
   없으므로 승인 대상인지 확인한다.
+- `.claude/settings.json`의 `Bash|PowerShell` 배선에 맞춰 Bash의
+  `pytest -m paid -q -o "junit_suite_name=x\"--collect-only"`도 승인 대상으로 판정한다.
+  실제 Bash와 무과금 pytest에서 paid 테스트 본문이 실행되는 명령이므로, 직접 훅 판정과
+  셸 실행을 짝지어 회귀 테스트한다. PowerShell의 같은 글자열과 혼동될 때는 보수적으로 묻는다.
+- PowerShell의 ``pytest -m paid -q -o junit_suite_name=x` --collect-only``는 백틱이
+  공백을 이스케이프해 `--collect-only`가 `-o` 값의 일부가 된다. Round 7 이전 훅은 이를 실제
+  수집 옵션으로 오인했고, 무과금 pytest에서는 paid 본문이 실행됐다. Bash의
+  `pytest -m paid -q -o junit_suite_name=x\ --collect-only`도 같은 위험으로 본다.
+  승인 필요 명령의 `--collect-only` 예외를 제거하고, 진짜 `--collect-only -m paid`도
+  승인 대상으로 바뀌는 회귀 테스트를 추가한다. 안전한 일반 pytest 호출은 통과시킨다.
+- CDEX-08: PowerShell의 ``pytest -q -o junit_suite_name=x` # -m paid``는 백틱으로
+  공백을 이스케이프해 `#`을 `-o` 값에 넣는다. `#` 뒤의 `-m paid`는 실제 옵션인데
+  Round 8 이전 `_strip_comment()`는 주석으로 잘라 승인 없이 통과시켰다. Round 8은
+  이 형태를 막았지만 위 설계 결정에 따라 주석 제거 로직 자체를 폐기한다. Bash의
+  `pytest -q -o junit_suite_name=x\ # -m paid`도 계속 `ask`여야 한다. 진짜 주석인
+  `pytest -q # -m paid`와 `pytest -q -o junit_suite_name=x # -m paid`는 이제
+  추가 승인을 요구한다. 일반 `pytest -q`와 유료 마커를 모두 제외한 호출은 통과시킨다.
 - .codex/hooks.json에서는 비용 훅 항목만 제거한다. 다른 훅은 보존한다.
   이 정리는 Claude용 ask가 공유 훅 파일에 반영되기 전 또는 같은 변경에서 수행한다.
   현재 미커밋 파일이므로 기존 다른 변경을 덮어쓰지 않는다.

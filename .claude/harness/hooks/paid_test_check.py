@@ -20,7 +20,20 @@ LlamaParse/OpenAI 설명은 schema_version 1 프로젝트의 기존 보호 동�
 자르고 **첫 토큰이 실제 pytest 실행기인 세그먼트에서만** 마커를 본다. 반대로
 `-m "not integration"`(= 기본 안전 호출)을 막아버리면 훅이 쓸모없어지므로 부정도 판다.
 
-`--collect-only` 는 수집만 하고 테스트를 돌리지 않아 과금이 없다. 막지 않는다.
+**`--collect-only` 예외는 없앴다.** 수집만 하면 과금이 없는 것은 맞지만, 그 예외가 이
+훅에서 나온 우회 **여덟 건 전부의 과녁**이었다 — 주석 속의 글자, `./--collect-only` 라는
+경로 이름, 인용 문자열 안의 글자, PowerShell 백틱과 Bash 역슬래시로 따옴표를 속이는 두
+가지. 전부 «실제 옵션인가» 를 문자열만 보고 가리려다 샜다.
+
+두 셸의 인용·이스케이프 규칙을 문자열 검사만으로 완전히 판별할 수 없다는 것이 결론이다.
+그래서 비용 경계에서는 예외 자체를 없앤다 — 유료 마커를 고르거나 기본 제외를 덮는 명령은
+`--collect-only` 가 붙어 있어도 승인을 묻는다. 안전한 일반 호출은 예외 없이도 그대로
+통과하므로, 잃는 것은 «유료 마커를 수집만 해 보는» 호출에 승인창이 한 번 더 뜨는 것뿐이다.
+
+**같은 이유로 셸 주석도 지우지 않는다.** 예외를 없앤 뒤에도 주석 제거 단계가 남아 있었고,
+CDEX-08 이 바로 그 한 군데를 통해 승인 없이 유료 본문을 실행했다. 이제 판정은 **원문
+그대로** 한다 — 원문에 유료 마커를 고르거나 기본 제외를 덮는 옵션이 보이면, 그것이 셸에서
+주석이든 아니든 묻는다. `pytest -q # -m paid` 가 그 오탐이고 그 대가는 받아들인다.
 
 `pre_commit_check.py` 의 규약을 그대로 따른다 — 훅 입력을 못 읽으면 통과시키고,
 사유는 stdout 에 UTF-8 로 낸다.
@@ -69,13 +82,6 @@ _MARKER_RE = re.compile(r"(?<![\w-])-m[\s=]*(\"[^\"]*\"|'[^']*'|[^\s]+)")
 _ADDOPTS_OVERRIDE_RE = re.compile(
     r"(?<![\w-])(?:-o|--override-ini)[\s=]*(\"[^\"]*\"|'[^']*'|[^\s]+)"
 )
-
-# 수집만 하는 호출은 테스트를 돌리지 않으므로 과금이 없다.
-#
-# **토큰 머리에서만 옵션으로 센다.** 앞을 `(?<![\w-])` 로만 막았을 때는 `/` 가 걸러지지 않아
-# `pytest -m paid ./--collect-only -q` 의 **경로 이름**이 수집 전용 옵션으로 읽혔다
-# (2026-11-19 실측). pytest 는 그것을 옵션이 아니라 인자로 받으므로 테스트는 실제로 돈다
-_COLLECT_ONLY_RE = re.compile(r"(?:^|(?<=\s))--(?:collect-only|co)\b")
 
 # `-m pytest` 로 부르는 인터프리터. 이 형태면 세그먼트 안에 `-m pytest` 가 있어야 pytest 다
 _PYTHON_RE = re.compile(r"^python[\d.]*(?:\.exe)?$", re.IGNORECASE)
@@ -155,78 +161,6 @@ def _basename(token: str) -> str:
     for sep in ("/", "\\"):
         token = token.rsplit(sep, 1)[-1]
     return token
-
-
-# 세그먼트를 따라가며 `(문자, 따옴표에 속하는가)` 를 돌려준다. 아래 두 함수의 공용부다.
-#
-# **따옴표 추적을 한 벌만 두는 것이 요점이다.** 두 벌로 두면 한쪽만 고쳐지고, 그 틈이 곧
-# 판정 우회가 된다 — 이 저장소가 `_hookutil` 을 만든 이유와 같은 모양이다.
-#
-# **PowerShell 의 이스케이프 문자는 백틱(`)이다.** 겹따옴표 안에서 백틱은 다음 글자를
-# 글자 그대로 만들므로 `` `" `` 는 따옴표를 닫지 않는다. 이것을 모르면 따옴표가 일찍 닫힌
-# 것으로 보여 뒤의 글자가 «따옴표 밖» 으로 분류되고, 그 틈으로
-# `-o "junit_suite_name=x`"--collect-only"` 가 수집 전용 예외를 얻어 갔다(2026-11-19 실측).
-#
-# **역슬래시는 이스케이프로 보지 않는다.** Windows 경로가 겹따옴표 안에 그대로 들어오므로
-# (`"C:\Program Files\python.exe"`) 그것을 이스케이프로 세면 정상 경로가 깨진다. 홑따옴표
-# 안에서는 PowerShell 이 백틱도 글자로 보므로 거기서는 이스케이프를 적용하지 않는다
-def _walk(segment: str):
-    quote = ""
-    index = 0
-    while index < len(segment):
-        ch = segment[index]
-        if quote == '"' and ch == "`" and index + 1 < len(segment):
-            yield ch, True
-            yield segment[index + 1], True
-            index += 2
-            continue
-        if quote:
-            yield ch, True
-            if ch == quote:
-                quote = ""
-            index += 1
-            continue
-        if ch in "\"'":
-            quote = ch
-            yield ch, True
-            index += 1
-            continue
-        yield ch, False
-        index += 1
-
-
-# 셸 주석을 지운다. **따옴표 밖에서, 토큰 머리에 있는 `#` 부터 줄 끝까지다.**
-#
-# 이게 없으면 주석 한 줄로 판정을 뒤집을 수 있었다 — `pytest -m paid -q # --collect-only`
-# 는 주석일 뿐인데 아래 수집 전용 예외가 글자만 보고 «수집만 한다» 로 통과시켰다
-# (2026-11-19 Codex 리뷰에서 실측으로 확인). 주석 안의 `-m` 으로 가짜 마커 식을 심는 것도
-# 같은 경로였다.
-#
-# **토큰 머리라는 조건이 꼭 필요하다.** 처음에는 `#` 이면 무조건 잘랐는데, 그러면
-# `pytest ./foo# -m paid -q` 가 `pytest ./foo` 로 잘려 **뒤의 `-m paid` 가 사라져 통과했다**
-# (실측). 셸도 그렇게 보지 않는다 — cmd·PowerShell·bash 모두 단어 중간의 `#` 은 주석이
-# 아니다. 따옴표 안의 `#` 도 주석이 아니다(`git commit -m "fix #123"`)
-def _strip_comment(segment: str) -> str:
-    out: list[str] = []
-    # 줄 시작을 공백처럼 본다 — 첫 글자가 `#` 이면 그 줄은 통째로 주석이다
-    previous = " "
-    for ch, quoted in _walk(segment):
-        if not quoted and ch == "#" and previous.isspace():
-            break
-        out.append(ch)
-        previous = ch
-    return "".join(out)
-
-
-# 따옴표로 감싼 부분을 공백으로 지운 사본. **옵션이 진짜 옵션인지 볼 때만 쓴다.**
-#
-# `pytest -m paid -k "--collect-only"` 처럼 인용 문자열 안에 옵션처럼 보이는 글자가 있을 때,
-# 그것을 실제 옵션으로 세면 안 된다. 마커 식을 읽을 때는 거꾸로 따옴표 **안** 이 필요하므로
-# 세그먼트를 통째로 이렇게 바꾸지 않고, 판정하는 자리에서만 이 사본을 쓴다.
-#
-# 길이를 보존한다 — 글자 수가 달라지면 정규식의 경계 판정이 원문과 어긋난다
-def _without_quoted(segment: str) -> str:
-    return "".join(" " if quoted else ch for ch, quoted in _walk(segment))
 
 
 # 세그먼트를 토큰으로 자른다. **공백이 든 경로를 따옴표로 감싼 형태 때문에 shlex 가 필요하다.**
@@ -322,19 +256,23 @@ def _provably_excludes_all(expr: str) -> bool:
 # **`-m` 이 있으면 기본 제외가 덮였다고 본다.** pytest 는 명령줄 `-m` 을 `addopts` 의
 # `-m` 보다 뒤에 적용하므로, 우리가 아는 제외가 남아 있다고 볼 수 없다. 그래서 «유료를
 # 고르나» 가 아니라 «유료를 다 빼나» 로 묻는다(모듈 docstring 참조)
+#
+# **원문을 그대로 본다 — 셸 주석을 지우지 않는다.** 주석 경계를 명령 문자열에서 증명하려던
+# `_strip_comment()` 가 그 자체로 우회 수단이었다. 토큰 머리 조건, 따옴표 안의 `#`,
+# 이스케이프된 공백까지 규칙을 세 번 덧댔는데도 CDEX-08
+# (``pytest -q -o junit_suite_name=x` # -m paid``)이 승인 없이 유료 본문을 실행했다 —
+# 두 셸 모두에서 표식 파일로 확인했다(2026-11-19). 전처리를 걷어내면 그 과녁이 사라진다.
+#
+# 대가는 오탐 하나다. 진짜 주석에 위험 옵션이 적힌 `pytest -q # -m paid` 도 이제 묻는다.
+# 승인창이 한 번 더 뜨는 쪽을 받아들인다 — 셸 문법을 문자열로 판별하려다 유료 호출을
+# 놓치는 것보다 싸다
 def _paid_reason(segment: str) -> str | None:
-    # **주석을 제일 먼저 지운다.** 주석 안의 글자로 아래 판정을 뒤집을 수 있었다
-    segment = _strip_comment(segment)
-
     if not _runs_pytest(segment):
         return None
 
-    # 수집 전용 예외는 **따옴표 밖의 진짜 옵션일 때만** 적용한다.
-    # 인용 문자열 안의 `--collect-only` 는 pytest 옵션이 아니다
-    if _COLLECT_ONLY_RE.search(_without_quoted(segment)):
-        # 수집만 한다. 테스트 본문이 안 돌므로 외부 호출도 없다
-        return None
-
+    # **여기 있던 수집 전용 예외를 없앴다.** 이 훅에서 나온 우회 여덟 건이 전부 그 예외를
+    # 노렸다. 「`--collect-only` 가 진짜 옵션인가」를 문자열만 보고 가리는 일을 그만두면
+    # 그 과녁이 사라진다. 자세한 이유는 모듈 docstring 에 있다
     marker_text = ", ".join(_PAID_MARKERS)
 
     # 다른 설정 파일을 고르면 그 파일의 addopts 가 적용된다. 우리는 그 내용을 모른다

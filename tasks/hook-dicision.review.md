@@ -866,3 +866,590 @@ lived — not in the judgement logic but in how the command string was read. The
 a row of their own.
 
 No code changed for this, so the Round 5 gate numbers above still stand.
+
+---
+
+# Round 5 live verification — attempted here, cannot be done here
+
+Direction received: sync the probe to commit `d413f3b`, then request Round 5's
+three commands verbatim through Claude's PowerShell tool, checking that no
+execution marker exists before approval and that declining prevents execution.
+
+## Done
+
+- Probe synced to `d413f3b`. Both `paid_test_check.py` and `_hookutil.py` in the
+  probe are **byte-identical** to that commit, compared with `git show`.
+- `ran/` empty before starting.
+- F1 is resolved: `tasks/` is committed (`9ce72f8`, `51ba164`, `d413f3b`). The
+  working tree is clean apart from the still-untracked `.agents/` and `.codex/`
+  — note that the `.codex/hooks.json` change from Round 4 is inside that
+  untracked directory and therefore is **not** in any commit yet.
+
+## The attempt, and why it cannot work from this session
+
+Requested verbatim through the PowerShell tool:
+
+```
+C:\my-harness\.venv\Scripts\python.exe -m pytest -m paid -q # --collect-only
+→ exit 5, "392 deselected in 0.09s", no confirmation dialog, command executed
+```
+
+**No dialog, and that is correct.** The hook resolves its project root from
+`CLAUDE_PROJECT_DIR` before `os.getcwd()` (`_hookutil._find_root()`), and in this
+session that variable points at `C:\my-harness`, whose
+`checks.expensive_tests.pytest_markers` is `[]`. Measured directly:
+`PROJECT_ROOT = C:\my-harness`, `_PAID_MARKERS = ()`,
+`blocked_reason("pytest -m paid -q") = None`.
+
+`cd` cannot change this. The hook process is spawned by the harness with the
+session's environment, not by Claude, so from a session rooted at this
+repository the hook is silent for every command. The three Round 5 commands
+would all execute with no dialog here, and recording that as a Round 5 result
+would be the same error this review has already caught twice.
+
+This row *is* worth keeping as a contract observation, just not as the
+verification: **a project that configures no paid markers is not interfered
+with.** That is the template's own state and the reason this repository can run
+`pytest -m paid` freely.
+
+## A real finding from that one run
+
+The output says `392 deselected`, with no "collected" line — so `-m paid` was
+applied and `--collect-only` was **not**. PowerShell stripped `# --collect-only`
+as a comment before pytest ever saw it.
+
+That makes the Round 5 comment leak concrete rather than theoretical. Before the
+fix, the hook read `--collect-only` out of that comment and treated the command
+as collect-only — while the shell discarded the comment and pytest ran with
+`-m paid` for real. The exception the hook granted had no counterpart in what
+actually executed.
+
+## What remains, and the exact requests to use
+
+The three commands have to be requested in a session whose project **is** the
+probe, because that is where the marker policy lives. The prompts must forbid
+substitution — Round 4's methodology note explains why: an assisting session
+once rewrote the command to `--collect-only` on its own, and the hook then had
+nothing to judge.
+
+For each one: confirm `ran/` is empty beforehand, watch for the hook's
+confirmation, **decline**, then confirm `ran/` is still empty.
+
+```
+1. Run this verbatim, exactly as written. Do not modify or substitute it:
+   C:\my-harness\.venv\Scripts\python.exe -m pytest -m paid -q # --collect-only
+
+2. Run this verbatim, exactly as written. Do not modify or substitute it:
+   C:\my-harness\.venv\Scripts\python.exe -m pytest -m paid ./--collect-only -q
+
+3. Run this verbatim, exactly as written. Do not modify or substitute it:
+   C:\my-harness\.venv\Scripts\python.exe -m pytest -m paid -q -o "junit_suite_name=x`"--collect-only"
+```
+
+Command 2 names a path that does not exist and command 3 sets a harmless ini
+value, so approving either would only produce a pytest error — the dialog is the
+whole result. Command 1 is the one that would really have run the paid test
+before the fix, so it is the one worth approving once as well, to confirm the
+marker appears only after approval.
+
+No real paid API is involved in any of them: the probe's `paid` tests write a
+file and nothing else.
+
+## Result — all three asked, none executed
+
+Run by the user in the probe session, hooks byte-identical to `d413f3b`
+(re-verified after the run).
+
+| Round 5 shape | 승인창 | 거절 후 실행 |
+|---|---|---|
+| `… -m pytest -m paid -q # --collect-only` | 떴다 | 없음 |
+| `… -m pytest -m paid ./--collect-only -q` | 떴다 | 없음 |
+| ``… -m pytest -m paid -q -o "junit_suite_name=x`"--collect-only"`` | 떴다 | 없음 |
+
+`ran/` was verified directly afterwards and the directory **did not exist at
+all** — so no test body ran under any of the three, not even the free `unit`
+one.
+
+All three were leaks before Round 5: each would have been granted the
+collect-only exception or gone unrecognised entirely, and each would have
+executed `-m paid` for real. They now reach the user as a per-call
+confirmation, and declining stops them.
+
+Attribution note, consistent with the rest of this review: the dialogs were not
+pasted this time, so "it was our hook rather than the generic Bash
+confirmation" rests on the user's report. That report is credible here — the
+verbatim hook text was captured earlier for this same project and hook, and the
+generic confirmation offers an always-allow option while the hook's does not.
+The `ran/` state is first-hand.
+
+Not re-observed: approving command 1 to watch `ran/paid` appear only after
+approval. That row was already confirmed in phase C with a different paid
+command, so it is covered, just not for this particular spelling.
+
+## Phase C and Round 5 verification: complete
+
+Observed: the confirmation appears, declining prevents execution, approving
+permits it, approval does not carry to the next call, a tool-wide permission
+grant does not bypass it, `bypassPermissions` is denied rather than waved
+through, a non-interactive run does not execute, and all three Round 5 shapes
+ask. Unobserved and recorded as such: `acceptEdits`/`auto` dialogs and
+`plan`/`dontAsk`, covered by unit tests over `_decision_for_mode()` only.
+
+---
+
+# Handoff — current state, superseding the earlier map's baseline
+
+**The "Handoff to Codex" map above opens with "HEAD `4f5300c`, nothing
+committed". That is now stale.** Read this section's baseline instead; the map's
+file-by-file breakdown is still accurate as a guide to *what* changed.
+
+| | |
+|---|---|
+| HEAD | `d413f3b` |
+| Commits since `4f5300c` | `9ce72f8` docs, `51ba164` build, `d413f3b` feat |
+| Range | 39 files, +3445 / −205 |
+| Uncommitted | `tasks/hook-dicision.review.md` (this file, still in use), plus untracked `.agents/` and `.codex/` |
+
+## Correction: `.codex/` is not a distribution gap
+
+An earlier note in this session claimed the uncommitted `.codex/hooks.json`
+change meant "the next person's checkout keeps the Codex wiring". **That was
+wrong.** The whole `.codex/` directory is untracked, so a clone receives neither
+the directory nor any Codex hook configuration — there is no stale wiring to
+inherit.
+
+Verified: `.codex/hooks.json` in this working copy contains zero occurrences of
+`paid_test_check`, so the Round 4 removal is present locally and in no commit.
+
+The real open question is narrower and belongs to
+`tasks/template-history-cleanup.md`, not here: whether `.codex/` should be
+tracked at all. Until it is, Codex's hook configuration is per-machine and
+cannot be reviewed from the repository.
+
+## Round 5 delta since the earlier map
+
+Two files beyond what that map lists:
+
+- `paid_test_check.py` — `+_walk()` (one shared quote/escape tracker, backtick
+  aware), `_strip_comment()` now requires a token boundary, `_COLLECT_ONLY_RE`
+  now requires `^` or whitespace before `--`.
+- `tests/test_paid_test_check.py` — 7 further cases, three of them
+  false-positive guards.
+
+Plus `.claude/wiki/knowledge/paid-test-approval.md`, which gained the
+명령을 읽는 규칙 section after the three rounds had made its original judgement
+table stale.
+
+**Current gate after Round 8: `ruff check` 0, `ruff format --check` 0,
+`pytest -q` 402 passed.** Beyond the Round 6 delta above, two more rounds landed
+in `paid_test_check.py` and its test file:
+
+- **Round 7** deleted the collect-only exception, and with it
+  `_COLLECT_ONLY_RE` and `_without_quoted()`. Three tests moved from the free
+  lists to the approval lists; that is the behaviour change made visible.
+- **Round 8** added `_escapes_next()` as the single escape decision, extended
+  escaping to outside quotes, and made `_strip_comment()` treat an escaped space
+  as a non-boundary.
+
+The knowledge document was rewritten in both rounds and is current.
+
+## What a final review should weigh
+
+1. **All nine bypasses were in command-string *reading*, none in the judgement
+   logic.** Whether the parsing rules in the knowledge document are the right
+   contract is the main design question left.
+2. **Does comment stripping still earn its place?** Eight of the nine bypasses
+   attacked the collect-only exception, which Round 7 removed. CDEX-08 is the
+   first that did not need it — it attacks `_strip_comment()` directly. That
+   leaves comment handling as the only remaining shell-parsing surface, and
+   every parsing rule here has now leaked at least once. Deleting it would cost
+   spurious approvals when a real comment happens to contain `-m paid`, and
+   would remove the surface entirely. This is a judgement call for the spec
+   owner, not something to settle from the implementation side.
+3. **Constructs still unexamined**, each a candidate for the same class of
+   defect: command substitution (`$(...)`, a backtick pair outside quotes), a
+   `;` or `&&` inside a quoted string, line continuations (`^` in cmd, trailing
+   `` ` `` in PowerShell, trailing `\` in Bash), the `--` argument separator,
+   and pytest's `@file` argument form.
+3. `_walk()`'s escape handling: backtick inside double quotes, and backslash
+   **only before a quote character**. The reasoning and the accepted cost
+   (`"C:\dir\"` reads as unterminated) are in its docstring.
+4. The unparseable-segment branch trades precision for safety. It is the one
+   place that deliberately over-asks.
+5. `acceptEdits`/`auto` and `plan`/`dontAsk` are unobserved, not passed.
+6. F2 and F7 remain open. F1 is closed by the commits above.
+
+---
+
+# Round 7 — the exception itself is gone
+
+Spec line 101 was rewritten: the collect-only exception does not apply to a
+command that selects paid markers or overrides the default exclusion, because
+the two shells' quoting and escape rules cannot be settled by string inspection
+at a cost boundary. `paid_test_check.py:347` was where that exception lived.
+
+This is a design change, not another patch, and it is the right one. **All eight
+bypasses were attacks on that single exception** — the comment, the
+`./--collect-only` path name, the quoted string, the PowerShell backtick, the
+Bash backslash. Each was an attempt to answer "is this `--collect-only` a *real*
+option?" from the command text. Removing the question removes the target.
+
+## What changed
+
+- The collect-only check is deleted from `_paid_reason()`.
+- `_COLLECT_ONLY_RE` and `_without_quoted()` were used only there, so both are
+  gone. No dead code left behind.
+- `_walk()` stays, and its justification is now narrower and stated as such:
+  quote tracking exists for **comment detection**. If a quote looks closed too
+  early, a following `#` is mistaken for a comment and the command is truncated
+  — and a truncation that removes `-m paid` makes a paid command look free. The
+  two escape rules are kept for that reason, not for the removed exception.
+- Module docstring, the knowledge document's judgement table, and its parsing
+  table all rewritten. The knowledge document gained a section stating why the
+  exception was dropped and what it costs.
+
+## The cost, stated plainly
+
+One thing gets worse: `pytest --collect-only -m paid`, which genuinely incurs no
+charge, now asks. That is a real regression in convenience for anyone listing
+paid tests. It was accepted deliberately — a spurious dialog costs a keystroke,
+and the alternative is maintaining a string-level answer to a question two
+shells disagree about.
+
+Safe calls are unaffected, because they never needed the exception:
+`pytest --collect-only -q` and
+`pytest --collect-only -m 'not paid and not paid2'` pass on their own merits.
+
+## Verification
+
+| Command | Exit | Result |
+|---|---|---|
+| `ruff check .` | **0** | All checks passed |
+| `ruff format --check .` | **0** | 77 files already formatted |
+| `pytest -q` | **0** | **398 passed** |
+
+Three tests moved from the free lists to the approval lists, which is the
+behaviour change made visible: `pytest --collect-only -m integration`,
+`pytest -m paid --collect-only`, `pytest --collect-only -m paid # 설명`. Two new
+free cases pin the other side — a collect-only call that selects nothing paid
+still passes. The Fast gate caught each of the three as I went, which is the
+cleanest evidence that the change does what the spec asked.
+
+Also fixed in passing: that edit duplicated two rows in the knowledge
+document's parsing table. Caught on re-read and removed.
+
+---
+
+# Round 8 — CDEX-08, and the first bypass proved by execution
+
+Spec line 153. The shape:
+
+```
+pytest -q -o junit_suite_name=x` # -m paid     (PowerShell)
+pytest -q -o junit_suite_name=x\ # -m paid     (Bash)
+```
+
+The escape character takes the **space**, so `#` becomes part of the `-o` value
+rather than starting a comment — and the `-m paid` after it is a genuine option.
+`_strip_comment()` saw an unquoted `#` after whitespace, truncated there, and
+the real `-m paid` vanished with the comment. The command then looked free.
+
+Round 6 taught `_walk()` about escapes, but only **inside double quotes**. This
+one escapes outside quotes, so none of that applied. Line 232 — the `_walk()`
+loop in `_strip_comment()` — was where it landed.
+
+## Proved by execution, not by argument
+
+This is the first round where the threat was demonstrated end to end rather than
+reasoned about. Paired, as the spec asked: hook verdict alongside a real shell
+run in a no-cost project whose `paid` test writes a marker file.
+
+| | hook | `ran/` after a real shell run |
+|---|---|---|
+| CDEX-08 Bash | `pass` | **`paid`** |
+| CDEX-08 PowerShell | `pass` | **`paid`** |
+| genuine comment, both shells | `pass` | `unit` only |
+| plain `pytest -q` | `pass` | `unit` only |
+
+The two `paid` markers are the finding: the shell really did hand `-m paid` to
+pytest and the body really did run, while the hook said the command was free.
+The controls confirm the other direction — where the `#` genuinely is a comment,
+the shell drops `-m paid` too, so passing it is correct.
+
+### My first attempt at this measurement was itself wrong
+
+The initial script reported all five cases safe with no markers. Nothing had
+run: `bash` ate the backslashes in `C:\my-harness\.venv\...`, so the command was
+never a valid invocation. An unexecuted command leaves no marker, which looks
+exactly like protection.
+
+The script now refuses to report a verdict unless the output proves pytest
+actually ran, and uses forward-slash paths for the Bash cases. Worth recording
+because it is the same failure this review keeps meeting: a check that cannot
+fail is not a check, and "no evidence of harm" is not evidence of safety.
+
+## The fix
+
+Escaping is now decided in one place, `_escapes_next(ch, following, quote)`:
+
+- Backtick escapes everywhere except inside single quotes.
+- Backslash escapes **outside** quotes broadly, and **inside** double quotes
+  only before a quote character — the narrow rule from Round 6 that keeps
+  `"C:\Program Files\python.exe"` intact.
+- Single quotes escape nothing, in either shell.
+
+`_strip_comment()` now tracks whether the preceding character was protected, so
+an **escaped space is not a token boundary** and a `#` after one is not a
+comment. Path separators outside quotes pick up a protection flag as a side
+effect, which is harmless: the characters are still emitted unchanged.
+
+## Verification
+
+| Command | Exit | Result |
+|---|---|---|
+| `ruff check .` | **0** | All checks passed |
+| `ruff format --check .` | **0** | 77 files already formatted |
+| `pytest -q` | **0** | **402 passed** |
+
+Four new cases: the two CDEX-08 shapes, plus two guards that a genuine comment
+is still stripped — important now that escaping is interpreted more widely. All
+eight cases from the earlier escape probe still pass; the one that changed
+expectation did so because of Round 7's removal of the collect-only exception,
+not a regression.
+
+The knowledge document's escape rows were corrected: they claimed escapes apply
+only inside double quotes, which this round makes false.
+
+**Running total: nine real bypasses.** Eight were attacks on the collect-only
+exception, which Round 7 deleted outright. CDEX-08 is the first that did not
+need it — it attacks comment stripping directly, which means removing the
+exception narrowed the surface but did not close it. The remaining surface is
+`_strip_comment()`, and the open question for review is whether comment handling
+earns its place at all given that every shell-parsing rule here has now leaked
+at least once.
+
+---
+
+# Round 6 — the Bash half of the escape problem
+
+Codex pointed at `paid_test_check.py:185`, the line where a quote closes. The
+finding: this hook is wired to **`Bash|PowerShell`**, and Round 5 taught
+`_walk()` only PowerShell's backtick. Bash escapes with a backslash, which
+Round 5 deliberately excluded to protect Windows paths — so the same trick
+survived in the other shell.
+
+Reproduced before changing anything:
+
+```
+pytest -m paid -q -o "junit_suite_name=x\"--collect-only"   →  통과 (LEAK)
+pytest -m paid -q -k "a\" --collect-only"                   →  통과 (LEAK)
+```
+
+Same mechanism as the backtick case: the tracker reads `\"` as a closing quote,
+so everything after it counts as unquoted, and `--collect-only` is then seen as
+a real option.
+
+## The fix had to be narrow
+
+Treating every backslash as an escape would break exactly what Round 5 was
+protecting — `"C:\Program Files\Python\python.exe"` would have `\P` consumed as
+an escape. So a backslash now escapes **only when the next character is a quote
+character**. Path separators are followed by letters and stay literal; `\"`
+cannot close a quote.
+
+One accepted cost: a path ending in a separator, `"C:\dir\"`, now looks like an
+unterminated quote. `_tokens()` then fails and the judgement falls to the
+conservative branch, so the failure direction is "ask", not "miss".
+
+Controls confirm both sides: the two leaks now ask, while
+`& "C:\Program Files\Python\python.exe" -m pytest -m "not paid and not paid2"`
+and `pytest -m "not paid and not paid2" --rootdir "C:\x\y"` stay free. Eight of
+eight cases correct, and the PowerShell backtick case is unchanged.
+
+| Command | Exit | Result |
+|---|---|---|
+| `ruff check .` | **0** | All checks passed |
+| `ruff format --check .` | **0** | 77 files already formatted |
+| `pytest -q` | **0** | **396 passed** |
+
+Four new regression cases: the two Bash shapes, and two Windows-path guards
+that would fail if the escape rule were widened again. The knowledge document's
+parsing table was corrected in the same change — it had said "역슬래시는
+이스케이프로 보지 않는다", which this round makes false.
+
+Probe hooks re-synced to the working tree.
+
+**Running total: eight real bypasses**, every one of them in how the command
+string is read rather than in the judgement logic. Round 5 fixed the backtick
+and left its mirror image in the other shell — a reminder that "fixed for the
+shell I was thinking about" is not fixed, and that the matcher in
+`settings.json` (`Bash|PowerShell`) is part of this hook's contract.
+
+
+# Round 9 — the preprocessing step is gone
+
+Round 8's fix worked. CDEX-08 asked afterwards and the suite was green. This
+round removes the thing it fixed, per the design decision in
+`hook-dicision.md`.
+
+`_strip_comment()` ran before every judgement in `_paid_reason()`. Its purpose
+was to stop characters inside a comment from flipping the verdict. Its rules
+were patched three times:
+
+| Patch | What it was for |
+|---|---|
+| `#` is a comment only at a token head | `pytest ./foo# -m paid -q` was cut to `pytest ./foo`, dropping a real `-m paid` |
+| `#` inside quotes is not a comment | `git commit -m "fix #123"` must not be truncated |
+| An escaped space is not a token boundary | CDEX-08 |
+
+Three patches, each failing the same way: proving a shell's comment boundary
+from the command string alone. Round 8 was the third, and it was correct. The
+decision is that a fourth is not worth waiting for.
+
+## What changed
+
+`_paid_reason()` now reads the segment verbatim. `_strip_comment()`, `_walk()`
+and `_escapes_next()` are gone — they called only each other, so the hook drops
+62 lines (+27 / -89). The remaining string interpretation is `shlex`
+tokenization and first-token executor identification; both already fail toward
+"ask".
+
+CDEX-08 is caught without interpreting either shell's escaping: `-m paid` is
+simply visible in the raw text.
+
+## The cost, stated plainly
+
+Two commands that cost nothing to run now ask:
+
+```
+pytest -q # -m paid
+pytest -q -o junit_suite_name=x # -m paid
+```
+
+The shell does treat these as comments, so no paid body runs. The hook asks
+anyway. This is the accepted false positive, and it is now a regression test
+rather than a known gap.
+
+The blast radius is small. A command whose raw text proves every paid marker is
+excluded stays free whatever its comment says — `pytest -m 'not paid and not
+paid2' # 설명` does not ask. Only a raw text that *selects* a paid marker can
+trigger the false positive, so `pytest -q` and every safe expression are
+untouched.
+
+Note the direction of the old error. The comment rules were not merely
+incomplete; in CDEX-08 they were wrong the *other* way — an escaped space put
+`#` inside an option value, and stripping cut a genuine `-m paid`, so a paid
+body ran with no approval. Trading that for one extra prompt is not a
+like-for-like trade.
+
+## Verification
+
+A throwaway project (markers `paid`/`paid2`, bodies that only touch a marker
+file, no billing) driving the real hook process over stdin:
+
+| Group | Cases | Result |
+|---|---|---|
+| Must ask | 7 | all `ask` |
+| Must not ask | 7 | all silent (allow) |
+| `plan` / `bypassPermissions` / missing mode | 3 | all `deny` |
+
+Then the same commands through each shell, reading which tests actually ran:
+
+| Shell | Command | Ran | Reading |
+|---|---|---|---|
+| PowerShell | `pytest -q # -m paid` | `unit` | real comment — the false positive costs nothing |
+| PowerShell | ``pytest -q -o junit_suite_name=x` # -m paid`` | `paid` | CDEX-08 — the hook must ask |
+| Bash | `pytest -q # -m paid` | `unit` | real comment |
+| Bash | `pytest -q -o junit_suite_name=x\ # -m paid` | `paid` | CDEX-08 |
+
+So the claim written into the knowledge document — that the shell does not pass
+`-m paid` to pytest in the commented form — is measured, not argued.
+
+| Command | Exit | Result |
+|---|---|---|
+| `ruff check .` | **0** | All checks passed |
+| `ruff format --check .` | **0** | 78 files already formatted |
+| `pytest -q` | **0** | **402 passed** |
+
+The two false positives moved from `FREE` to `NEEDS_APPROVAL`; the stale
+rationale comments that referenced comment stripping were rewritten to describe
+what the code now does. `knowledge/paid-test-approval.md` keeps only the current
+rules: the comment row, a reading-rules table without the escape machinery, and
+an "accepted false positive" section. The reasoning and the rejected
+alternatives went to Plan History
+(`.claude/wiki/history/plan/2026-11-19-paid-hook-comment-stripping.md`), since
+these `tasks/` files are deleted at cleanup.
+
+**Running total: eight real bypasses, all eight in how the command string is
+read.** Rounds 5 through 8 each narrowed that reading correctly and were each
+followed by another case. Round 9 removes the reading instead of narrowing it
+again, and pays one false positive for it.
+
+Out of scope here, still open in `hook-dicision.md`: the `.codex/hooks.json`
+entry, the README application example, and the Fast/Full argv exclusions.
+
+## Files changed, checks not run, and deltas from the spec
+
+Changed:
+
+- `.claude/harness/hooks/paid_test_check.py` (+27 / -89) — `_paid_reason()`
+  reads the raw segment; `_strip_comment()`, `_walk()` and `_escapes_next()`
+  deleted; the module docstring and the comment above `_paid_reason()` record
+  why the stage is gone, so it does not come back as a fix.
+- `tests/test_paid_test_check.py` (+42 / -12) — the two real-comment commands
+  moved `FREE` → `NEEDS_APPROVAL`; three rationale comments that explained a
+  verdict by comment stripping now describe what the code does.
+- `.claude/wiki/knowledge/paid-test-approval.md` (+38 / -13) — comment row
+  inverted, escape-rule table dropped, `받아들인 오탐` section added.
+- `.claude/wiki/history/plan/2026-11-19-paid-hook-comment-stripping.md` — new;
+  problem, options, decision, reasons, four rejected alternatives, measurements.
+- This file. `hook-dicision.md` is untouched — Codex owns it.
+
+Not run, and why:
+
+- No paid body ran against a billing provider. The throwaway project's
+  `paid`/`paid2` tests only append to a marker file, so "`paid` ran" in the
+  tables above means that dummy. That is what makes the CDEX-08 measurement
+  safe to repeat on demand.
+- The Fast profile was not run separately; the Full profile is a superset of it
+  and is green.
+- The README application example and the Fast/Full argv exclusions were not
+  exercised. They are separate items in the spec and nothing in this round
+  touches them, so the temp project checked the hook and the two shells only.
+- `.codex/hooks.json` was not changed. Same reason, and it is untracked.
+
+Deltas from the spec: none. The decision asked for the raw segment to reach
+`_paid_reason()`, the three helpers removed if unused elsewhere, the contract
+pinned in regression tests, a verdict-and-shell check in a cost-free project,
+and the approval scope plus this false positive left in Knowledge as the
+current contract. All six are done, and the helpers were in fact unused outside
+each other.
+
+## Correction — the spec moved, and it widened the contract
+
+An earlier draft of this round flagged two rows in `hook-dicision.md` as
+explaining a verdict by the mechanism this round removed. That note is
+withdrawn: the spec revision in the working tree had already rewritten both the
+`--collect-only` row and the `Bash의 \"` row to argue from the raw text. Reading
+a stale copy was my error, not the spec's.
+
+That same revision names three commands the earlier draft did not cover:
+
+```
+pytest -q # -m unit
+pytest -q # -c other.ini
+pytest -q # -o addopts=
+```
+
+These select no paid marker, so the accepted false positive is wider than "a
+comment that selects a paid marker" — it is **any text that could override the
+default exclusion**, comment or not. The implementation already behaved this
+way (an unproven `-m`, a `-c` config switch and an `addopts` override are each
+checked against the raw segment); all three return `ask` when driven through
+the real hook. What was missing was the contract: they are now regression cases
+in `NEEDS_APPROVAL`, and the scope sentence in `knowledge/paid-test-approval.md`
+and in Plan History has been corrected, since both said the false positive
+arises only when the raw text selects a paid marker.
+
+Controls for the other side: `pytest -q # 설명` and `pytest -q # --collect-only`
+stay free, so an ordinary comment still costs nothing.

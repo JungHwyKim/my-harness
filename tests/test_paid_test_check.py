@@ -104,6 +104,10 @@ BLOCKED = [
     # -m 을 안 쓰고 기본 제외를 날리는 우회
     "pytest -o addopts= tests/",
     'pytest --override-ini "addopts=" ',
+    # **수집 전용 예외를 없앴다.** 수집만 하면 과금이 없는 것은 맞지만, 「진짜 옵션인가」를
+    # 문자열로 가리려다 우회가 여덟 건 나왔다. 유료 마커를 고르는 명령은 `--collect-only`
+    # 가 붙어도 묻는다 — 잃는 것은 수집만 해 보는 호출의 승인창 한 번이다
+    "pytest --collect-only -m integration",
 ]
 
 # 막으면 안 되는 명령
@@ -115,8 +119,6 @@ ALLOWED = [
     "pytest -m 'not integration'",
     'pytest -m "not slow and not integration"',
     "pytest -o \"addopts=-m 'not integration'\"",
-    # 수집만 한다. 테스트 본문이 안 돌아 과금이 없다
-    "pytest --collect-only -m integration",
     # -m 과 integration 이 둘 다 있지만 pytest 가 아니다
     'git commit -m "integration 테스트 추가"',
     'git commit -m "pytest integration marker 추가"',
@@ -363,7 +365,8 @@ NEEDS_APPROVAL = [
     # addopts 를 덮었는데 paid2 가 빠지지 않았다
     "pytest -o \"addopts=-m 'not paid'\"",
     # **셸 주석으로 수집 전용 예외를 흉내낸다.** 주석일 뿐인데 글자만 보고 통과시키던
-    # 구멍이다(2026-11-19 Codex 리뷰에서 실측). 주석을 먼저 지워야 걸린다
+    # 구멍이다(2026-11-19 Codex 리뷰에서 실측). 주석을 지우지 않는 지금은 원문에 보이는
+    # `-m paid` 로 걸린다
     "pytest -m paid -q # --collect-only",
     # 인용 문자열 안의 옵션처럼 보이는 글자도 옵션이 아니다
     'pytest -m paid -q -k "--collect-only"',
@@ -376,10 +379,12 @@ NEEDS_APPROVAL = [
     # 고친 코드를 스스로 두드려 보다 찾은 회귀다(2026-11-19)
     r'& "C:\Program Files\Python\python.exe -m pytest -m paid -q',
     r'"C:\Program Files\Python\python.exe -m pytest -m paid -q',
-    # 주석 안에 따옴표가 섞여도 주석은 주석이다
+    # 주석이 붙어 있어도 원문의 `-m paid` 로 묻는다. 이 형태는 따옴표까지 깨져 있어
+    # 토큰화도 실패하고, 그쪽 경로 역시 보수적인 쪽으로 떨어진다
     "pytest -m paid -q # it's a comment",
-    # **`#` 가 단어 중간이면 주석이 아니다.** 무조건 자르면 뒤의 `-m paid` 가 사라져
-    # 통과했다 — 주석 제거가 거꾸로 우회 수단이 된 자리다(2026-11-19 실측)
+    # **`#` 가 단어 중간이면 주석이 아니다.** 주석을 무조건 자르던 때는 뒤의 `-m paid` 가
+    # 사라져 통과했다 — 주석 제거가 거꾸로 우회 수단이 된 자리다(2026-11-19 실측).
+    # 전처리를 걷어낸 지금은 원문에 그대로 남아 있다
     "pytest ./foo# -m paid -q",
     # **경로 이름이 옵션처럼 보이는 경우.** pytest 는 이것을 인자로 받으므로 테스트가
     # 실제로 돈다. 앞 경계를 `\s` 로 못 박기 전에는 수집 전용으로 읽혔다
@@ -388,6 +393,33 @@ NEEDS_APPROVAL = [
     # **PowerShell 백틱으로 겹따옴표를 이스케이프한 형태.** 따옴표가 일찍 닫힌 것으로
     # 보여 뒤의 글자가 «따옴표 밖» 으로 분류되고, 그 틈으로 수집 전용 예외가 샜다
     'pytest -m paid -q -o "junit_suite_name=x`"--collect-only"',
+    # **같은 수를 Bash 의 역슬래시로.** 훅은 `Bash|PowerShell` 양쪽에 배선돼 있는데
+    # 백틱만 이스케이프로 보고 있어서 이쪽이 그대로 남아 있었다(2026-11-19 Codex 지적)
+    r'pytest -m paid -q -o "junit_suite_name=x\"--collect-only"',
+    r'pytest -m paid -q -k "a\" --collect-only"',
+    # **수집 전용 예외를 없앴으므로 진짜 옵션이어도 묻는다.** 위 트릭들이 전부 그 예외를
+    # 노렸고, 「진짜 옵션인가」를 문자열로 가리는 일을 그만두면 과녁이 사라진다.
+    # 앞이든 뒤든, 주석이 달려 있든 유료 마커를 고르면 묻는다
+    "pytest --collect-only -m paid",
+    "pytest -m paid --collect-only",
+    "pytest --collect-only -m paid # 설명",
+    # **CDEX-08: 공백을 이스케이프해 `#` 을 값 안에 넣는다.** 그러면 `#` 은 주석이 아니고
+    # 뒤의 `-m paid` 는 진짜 옵션이다. 주석 제거가 그것을 잘라 승인 없이 통과시켰고,
+    # 두 셸 모두에서 유료 본문이 실제로 실행되는 것을 표식 파일로 확인했다(2026-11-19).
+    # 주석 제거를 폐기한 지금은 두 셸의 이스케이프 규칙을 해석하지 않고도 걸린다
+    "pytest -q -o junit_suite_name=x` # -m paid",
+    r"pytest -q -o junit_suite_name=x\ # -m paid",
+    # **진짜 주석에 적힌 위험 옵션도 묻는다 — 받아들인 오탐이다.** 셸은 이것을 주석으로
+    # 보고 `-m paid` 를 pytest 에 넘기지 않으니 실제로는 과금되지 않는다. 그래도 묻는 쪽을
+    # 고른다: 주석 경계를 문자열로 증명하려던 규칙이 CDEX-08 의 통로였고, 그 전처리를
+    # 걷어낸 대가가 이 승인창 하나다(Round 8 설계 결정)
+    "pytest -q # -m paid",
+    "pytest -q -o junit_suite_name=x # -m paid",
+    # **유료 마커를 고르는 글자만이 아니다.** 기본 제외를 덮을 수 있는 글자면 주석 안이어도
+    # 묻는다 — 증명되지 않는 `-m`, 다른 설정을 고르는 `-c`, `addopts` 를 덮는 `-o`
+    "pytest -q # -m unit",
+    "pytest -q # -c other.ini",
+    "pytest -q # -o addopts=",
 ]
 
 # 물으면 안 되는 쪽. 여기서 헛물으면 훅이 통째로 무시당한다
@@ -396,8 +428,6 @@ FREE = [
     "pytest -m 'not paid and not paid2'",
     'pytest -m "not slow and not paid and not paid2"',
     "pytest -o \"addopts=-m 'not paid and not paid2'\"",
-    # 수집만 한다. 테스트 본문이 안 돌아 과금이 없다
-    "pytest --collect-only -m paid",
     # pytest 가 아니다
     "git commit -m 'paid 마커 추가'",
     # 따옴표 **안** 의 `#` 은 주석이 아니다. 주석 제거가 여기까지 먹으면 커밋 메시지가
@@ -410,12 +440,17 @@ FREE = [
     # 따옴표가 깨진 명령에 pytest 라는 말이 있으면 보수적으로 묻지만, 애초에 pytest 가
     # 아닌 것은 그대로 통과해야 한다 — 그 선이 흐려지면 `echo` 한 줄에도 승인창이 뜬다
     "echo 'pytest -m paid'",
-    # 진짜 수집 전용은 주석이 붙어도 통과한다
-    "pytest --collect-only -m paid # 설명",
-    # 옵션이 뒤에 와도 진짜 옵션이다. 경계를 조이다 이쪽을 막으면 안 된다
-    "pytest -m paid --collect-only",
+    # 유료 마커를 안 고르면 `--collect-only` 가 붙든 말든 그대로 통과한다
+    "pytest --collect-only -q",
+    "pytest --collect-only -m 'not paid and not paid2'",
+    # **주석이 붙어도 안전한 식은 안전하다.** 오탐은 원문이 유료 마커를 고르는 명령에만
+    # 생긴다 — 모든 유료 마커를 빼는 식이 원문에 보이면 주석이 뭐라고 적혀 있든 통과한다
     # `#` 가 단어 중간이어도 판정은 평소대로 — 안전한 식은 안전하다
     "pytest ./foo# -m 'not paid and not paid2' -q",
+    # **역슬래시 이스케이프를 넓게 적용하면 여기가 깨진다.** Windows 경로는 겹따옴표 안에
+    # 역슬래시를 그대로 담으므로, 다음 글자가 따옴표일 때만 이스케이프로 봐야 한다
+    r'pytest -m "not paid and not paid2" --rootdir "C:\x\y"',
+    r'& "C:\Program Files\Python\python.exe" -m pytest -m "not paid and not paid2"',
 ]
 
 
