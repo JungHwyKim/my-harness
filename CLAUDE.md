@@ -27,5 +27,6 @@
 - `overview/`: 어디에 무엇이 있는가
 - `knowledge/`: 현재 무엇이 참인가
 - `history/`: 왜 그렇게 되었는가
+- `.claude/skills/`: 되풀이하는 다단계 절차를 어떻게 하는가
 - Git: 무엇이 변경되었는가
 - Tests / CI: 현재 동작이 검증되는가
