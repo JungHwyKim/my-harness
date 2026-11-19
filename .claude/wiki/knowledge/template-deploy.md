@@ -29,9 +29,6 @@
 - 비우는 범위는 `history/plan`·`task`·`verify` 아래의 `*.md`다. `history/README.md`는 그 세
   폴더 밖이고 `.gitkeep`은 `*.md`가 아니므로 둘 다 남는다.
 
-상세 명령 순서는 현재 `tasks/template-history-cleanup.review.md`에 있다. 그 파일은 임시
-파일이므로 최종 위치는 명세 소유자가 정한다.
-
 ## 끊기 전 보존 확인
 
 **그 시점의 기록 전부**를 확인한다. 고정 목록을 확인하는 것이 아니다 — 명세가 이름을 적은
@@ -44,6 +41,33 @@
 
 두 커밋 모두 `origin/main`에 있다(2026-11-20 확인). Git 색인에 올리기만 한 것은 보존이
 아니다.
+
+## 끊는 절차
+
+작업 중인 체크아웃에서 끊지 않는다. 전용 worktree는 `main`의 커밋에서 **깨끗한 작업 트리와
+자기 색인**을 들고 시작하므로, 원래 체크아웃의 스테이징·미스테이징 변경이 배포 커밋에 닿을
+수 없다. 다른 작업의 변경을 지우거나 되돌려 트리를 깨끗하게 만들지 않는다 — 격리로 푼다.
+
+위 「끊기 전 보존 확인」을 끝낸 뒤, 저장소 루트에서 실행한다.
+
+```powershell
+git worktree add -b template/v2.1 ../my-harness-template main
+cd ../my-harness-template
+Get-ChildItem .claude/wiki/history/plan, .claude/wiki/history/task, .claude/wiki/history/verify -Filter *.md | Remove-Item
+git add -A .claude/wiki/history
+git commit -m "chore: empty harness history for template deploy"
+git show --name-status --format= HEAD
+```
+
+- 스테이징은 `.claude/wiki/history` 경로만 한다. `git commit -a`는 쓰지 않는다 — 추적된
+  수정 전부를 끌어온다.
+- 마지막 `git show`가 푸시 전 게이트다. 목록이 기록 삭제뿐이어야 한다. 남는 모양은
+  `history/README.md`와 세 `.gitkeep`이다.
+- 푸시한 뒤 원래 체크아웃에서 `git worktree remove ../my-harness-template`로 작업 사본만
+  지운다. 브랜치는 남는다. 커밋하지 않은 변경이 그 worktree에 있으면 `remove`가 거부하므로,
+  강제로 지우지 말고 무엇이 남았는지 본다.
+- 검증 기록: 무관한 수정 하나를 스테이징하고 다른 하나를 미스테이징한 격리 복제에서 배포
+  커밋에 기록 삭제 5개만 담겼고, 원래 체크아웃의 수정은 그대로였다(2026-11-20).
 
 ## 배포 사본에서 기록 읽기
 

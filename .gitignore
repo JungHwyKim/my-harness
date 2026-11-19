@@ -23,6 +23,7 @@ __pycache__/
 #   직접 실행한다고 명시한다. 추적하면 같은 사실을 두 파일이 서로 다르게 들고 있게 된다.
 #
 # 대신 Codex의 훅 설정은 머신마다 따로 두고 저장소에서 리뷰할 수 없다. 그 비용은 받아들였다.
-# 배포 대상 전반은 `tasks/template-history-cleanup.md`가 소유한다.
+# 무엇이 배포에 따라오는지는 `README.md`의 「무엇이 따라오고 무엇이 안 따라오는가」 표가,
+# 내보내는 쪽의 계약과 끊는 절차는 `.claude/wiki/knowledge/template-deploy.md`가 소유한다.
 .agents/
 .codex/

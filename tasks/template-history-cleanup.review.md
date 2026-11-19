@@ -12,10 +12,13 @@ modified in the tree). Its predecessor condition is met: the environment work is
 reported complete, and no session was editing `README.md` — the only file both
 tasks touch.
 
-Status: implemented; Codex's 2026-11-20 review raised THC-01 and THC-02, both now
-fixed and verified — see "Review findings" below. The deployment model was decided
-by the user mid-task: **the harness's History stays on `main`, and only a deploy
-ref is emptied.** See "Decision" below.
+Status: implemented and accepted. Codex's 2026-11-20 review raised THC-01 and
+THC-02; both were fixed, verified, and **judged resolved in its re-review** of
+`4b26083`, with no further blocking findings — see "Review findings" below. What
+is left is step 9: the preservation landed in this round, the deletion of the two
+temporary files has not. The deployment model was decided by the user mid-task:
+**the harness's History stays on `main`, and only a deploy ref is emptied.** See
+"Decision" below.
 
 The initial-History criterion is reported in two halves, as the review asks.
 **Cleanup procedure: verified** — executed in an isolated clone, see THC-01.
@@ -56,22 +59,13 @@ re-pointed each release: one unchanging clone command, but a force-push every
 time and no way back to an earlier template. `README.md` now documents this
 convention and the `--depth 1` clone.
 
-Executed and verified during this task, then reverted. To publish, cut the ref in
-its own worktree rather than on the checkout you work in — THC-01 below says why:
-
-```powershell
-git worktree add -b template/v2.1 ../my-harness-template main
-cd ../my-harness-template
-Get-ChildItem .claude/wiki/history/plan, .claude/wiki/history/task, .claude/wiki/history/verify -Filter *.md | Remove-Item
-git add -A .claude/wiki/history
-git commit -m "chore: empty harness history for template deploy"
-git show --name-status --format= HEAD
-```
-
-That last line is the gate before any push: the list must be the record deletions
-and nothing else. Afterwards, from the main checkout,
-`git worktree remove ../my-harness-template` — the branch stays, only the extra
-working copy goes.
+Executed and verified during this task, then reverted. **The command sequence now
+lives in `.claude/wiki/knowledge/template-deploy.md`, section 「끊는 절차」** — moved
+there in this round, because a permanent contract cannot defer its procedure to a
+file that step 9 deletes. What it requires: a dedicated worktree instead of the
+working checkout, staging limited to `.claude/wiki/history`, no `git commit -a`,
+`git show --name-status` as the gate before pushing, and `git worktree remove`
+afterwards. THC-01 below is why each of those is there.
 
 The deploy ref is never merged back into `main` — that commit deletes the
 records, and merging it would put the deletion on `main`, which is the whole
@@ -249,21 +243,34 @@ name and the commit it came from.
    the procedure above, and the clone command in the README will not work until
    that ref is cut and pushed. The README keeps the `main`-and-clear-it route
    alongside it, so no reader is left without a working path.
-2. **Nothing is pushed**, this fix round included. The revision request does not
-   authorize a commit, so `README.md`, `.gitignore` and this report are modified
-   in the working tree only.
-3. **`438dc3c` is on no remote.** The blob route added for THC-02 resolves for
-   `bfeb428` but not for the two records preserved in `438dc3c`, until `main` is
-   pushed. The `--unshallow` route works either way.
-4. **The deploy procedure lives only in this temporary file.** Step 9 deletes it.
-   It should land in the Plan History entry written when the ref is cut, or in
-   `README.md` as a maintainer section — the spec owns where deploy steps belong,
-   so this is Codex's call, not a change made here.
+2. **Pushed since.** At fix-round time nothing was committed; that round is now
+   `4709aac`, and `main` and the local `origin/main` ref both sit at `4b26083`.
+3. **On the remote-tracking ref since.** At fix-round time `438dc3c` was on no
+   remote, so the THC-02 blob route resolved only for `bfeb428`. Both
+   preservation commits are now in the history of the local `origin/main` ref
+   (`git branch -r --contains`, 2026-11-20) — that reads the local tracking ref,
+   not a fresh query to github.com, which this session never made. The
+   `--unshallow` route never depended on this.
+4. **Moved in this round.** At fix-round time the deploy procedure lived only in
+   this temporary file. It is now in
+   `.claude/wiki/knowledge/template-deploy.md` 「끊는 절차」, and that document no
+   longer defers its command sequence to a file step 9 deletes.
 5. **Plan History entry** for the deployment model, when that ref is cut.
-6. `tasks/quality-env-setup.md`, `tasks/template-history-cleanup.md` and
-   `.claude/skills/handoff/SKILL.md` are Codex's uncommitted edits, left
-   untouched. SKILL.md changed *during* this fix round — it gained a
-   「리뷰 결과 기록과 종료 확인」 section — which is why the working tree holds a
-   file this task never touched. Nothing in that section changes what this report
-   owes: the verdict stays in the spec, this file stays Claude's.
+6. **Codex's files are committed now** — `d20fd24`, `4b19597`, `4b26083`. What is
+   uncommitted is `tasks/template-history-cleanup.md`, which carries the
+   re-review text; `tasks/quality-env-setup.review.md` is untracked and belongs
+   to the other task. Neither was touched here.
 7. `doctor.md` is still an unimplemented spec, unrelated to this task.
+8. **Step 9 is not finished.** Preservation is done. What remains is a commit
+   carrying this round plus the re-review text now sitting uncommitted in
+   `tasks/template-history-cleanup.md`, and then the deletion of the two
+   temporary files. The cleanup condition is that each file's latest content is
+   in a confirmed commit; the spec's is not, so deleting now would drop Codex's
+   re-review. Neither the commit nor the deletion is authorized in this round.
+9. **One reference will dangle after cleanup.** `tasks/quality-env-setup.md:45`
+   reads 「템플릿 배포와 초기 History 정리는 `tasks/template-history-cleanup.md`가
+   소유한다」, and that file goes away at step 9. It is another task's in-flight
+   spec, so it was not edited here — Codex's to repoint, presumably at
+   `.claude/wiki/knowledge/template-deploy.md`.
+   `.claude/skills/handoff/SKILL.md:41` also names this ID, but only as an
+   example of ID naming, which survives the deletion.
