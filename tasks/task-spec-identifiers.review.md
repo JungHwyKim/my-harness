@@ -5,7 +5,8 @@ commits made. Implemented against the spec as revised on 2026-11-19 — see
 "The spec changed under the implementation" below, which is a finding in its
 own right.
 
-Status: implemented. The Full profile is green. One deviation and two
+Status: implemented, approved by Codex on 2026-11-19, preserved in `438dc3c`
+and cleaned up under step 9. The Full profile is green. One deviation and two
 out-of-spec additions are listed; nothing is left unreported.
 
 ## Changed files
@@ -158,27 +159,41 @@ implementation, and the diff carries it.
 Neither record duplicates `SKILL.md`. The rules live there; History holds only
 the rejected alternatives and the cause.
 
-## Step 9 status: preserved, not cleaned up
+## Step 8: Codex approved
 
-The three cleanup preconditions, checked on 2026-11-19:
+Codex recorded its final review in the spec itself on 2026-11-19: **승인,
+해결되지 않은 blocking finding 없음, Step 8 완료.** It reviewed against
+`438dc3ca132d729c1de4af17f67ce2e8e285756b`, this spec's done criteria, and this
+report, checked all six criteria off, and confirmed that the implementation did
+not modify, rename or delete any other task's spec.
+
+Three things in that verdict are worth keeping here, since the spec it was
+written in is being deleted:
+
+- It agrees with the **Codex** owner decision for `tasks/_template.md`.
+- It accepts the mid-implementation finding as valid, states that the change was
+  Codex's own, and resolves it to the record rather than to an unmet criterion.
+- It did **not** re-run the Full profile. It verified documents and the diff and
+  took the lint/format/405-passed result from this report. So the only execution
+  evidence for this task is the two runs recorded above, both mine.
+
+## Step 9: preserved and cleaned up
+
+The three cleanup preconditions, re-checked after the approval:
 
 | Precondition | State |
 |---|---|
-| Done criteria met, checks accounted for, **no unresolved blocking finding in Codex's final review** | **Not satisfied — there has been no final review.** The spec's 상태 still reads 「구현 가능 · 공통 절차와 템플릿에는 아직 미반영」 and no verdict exists |
-| Current contract summarized in its owner document; decisions follow the Plan History procedure | Satisfied. The contract *is* `.claude/skills/handoff/SKILL.md`, the owner document for repeatable procedures per `AGENTS.md:53` and the new `CLAUDE.md` row. Two History records written, above |
-| Latest contents of both temporary files in a verified Git commit | Satisfied by the preservation commit for this task |
+| Done criteria met, checks accounted for, no unresolved blocking finding in Codex's final review | Satisfied by the approval above |
+| Current contract summarized in its owner document; decisions follow the Plan History procedure | Satisfied. The contract *is* `.claude/skills/handoff/SKILL.md`, the owner document for repeatable procedures per `AGENTS.md:53` and the new `CLAUDE.md` row. Two History records, above |
+| Latest contents of both temporary files in a verified Git commit | Satisfied: `438dc3c` holds the implementation, and the approval commit holds this file and the spec in their final state |
 
-So this spec and its review **stay in `tasks/`**. Deleting them now would destroy
-the report step 8 is supposed to read, and the procedure's own rule applies:
-보존이 덜 됐으면 파일을 남기고 남은 정리 작업을 보고한다.
+Both temporary files were then removed, the way `07bd76e` removed the hook
+task's pair. They are readable in the commits named above.
 
-I did not set the spec's 상태 to complete. The rule installed by this very task
-puts that field in Codex's hands — 「명세의 상태 표기는 Claude에게 명세를 고칠 권한을
-주지 않는다」 — so completion is recorded here instead, in the file that is mine.
-
-**What is left for cleanup:** Codex's step-8 review, and then deleting
-`tasks/task-spec-identifiers.md` and `tasks/task-spec-identifiers.review.md` in
-one commit, the way `07bd76e` removed the hook task's pair.
+I never set the spec's 상태 myself. The rule installed by this very task puts
+that field in Codex's hands — 「명세의 상태 표기는 Claude에게 명세를 고칠 권한을 주지
+않는다」 — so Codex wrote 「구현 완료 · Codex 최종 리뷰 승인」 and completion is
+recorded here, in the file that is mine.
 
 ## Remaining
 
@@ -189,5 +204,7 @@ one commit, the way `07bd76e` removed the hook task's pair.
 3. The Ruff `I` / `RUF100` adoption decision, the template History cleanup
    (`tasks/template-history-cleanup.md`), and Codex's final review of
    `tasks/handoff.md` are untouched by this task and stay open.
-4. Nothing here is committed. This report and the three documents sit in the
-   working tree at `bfeb428`.
+4. `tasks/quality-env-setup.md` and `tasks/template-history-cleanup.md` are
+   Codex's uncommitted status refreshes to other tasks' specs. Left alone: not
+   this task's files, and not deleted, so nothing is lost by leaving them in the
+   working tree.
