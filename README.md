@@ -17,9 +17,9 @@ git clone https://github.com/JungHwyKim/my-harness <your_dir>
 
 `main`을 그대로 clone 하면 `.claude/wiki/history/`에 **이 하네스를 개발하면서 쌓인
 기록**이 들어 있다. 새 프로젝트에서는 그것을 지우고 시작한다 — 공통 README와 세 하위
-폴더의 `.gitkeep`만 남긴다. 지운 기록의 내용은 이 저장소의 커밋에 그대로 있어
-`git show <커밋>:<경로>`로 읽는다. 템플릿용 ref를 따로 배포한 경우에는 그 ref의 History가
-이미 비어 있으니 지울 것이 없다.
+폴더의 `.gitkeep`만 남긴다. 이렇게 받은 사본에는 커밋 이력이 다 있으므로, 지운 기록은
+`git show <커밋>:<경로>`로 다시 읽는다. 템플릿용 ref를 따로 배포한 경우에는 그 ref의
+History가 이미 비어 있으니 지울 것이 없다.
 
 배포용 ref는 `template/<버전>` 이름을 쓴다 — `main`에서 끊어 History만 비운 스냅샷이다.
 그 ref가 있으면 거기서 바로 받고 지울 것이 없다.
@@ -28,8 +28,16 @@ git clone https://github.com/JungHwyKim/my-harness <your_dir>
 git clone --branch template/v2.1 --depth 1 https://github.com/JungHwyKim/my-harness <your_dir>
 ```
 
-`--depth 1`은 커밋 이력까지 따라오지 않게 한다. 배포 ref는 `main`으로 병합하지 않는다 —
-기록을 지운 커밋이 `main`에 섞인다.
+`--depth 1`은 커밋 이력까지 따라오지 않게 한다. 그래서 이 사본에서는
+`git show <커밋>:<경로>`가 통하지 않는다 — 가리킬 커밋이 로컬에 없다. 지운 기록을 읽어야
+하면 둘 중 하나다.
+
+- 원본 저장소에서 바로 본다 —
+  `https://github.com/JungHwyKim/my-harness/blob/<커밋>/<경로>`. 푸시된 커밋만 열린다.
+- `git fetch --unshallow`로 이력을 받은 뒤 `git show <커밋>:<경로>`를 쓴다. 배포 ref에서
+  이어지는 조상 커밋이 함께 따라온다.
+
+배포 ref는 `main`으로 병합하지 않는다 — 기록을 지운 커밋이 `main`에 섞인다.
 
 이 프로젝트가 앞으로 만드는 기록은 기존 Plan·Task·Verify 절차대로 쌓인다.
 
