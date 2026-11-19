@@ -1,0 +1,8 @@
+# Direct dev dependencies: the two tools the Full Quality Profile runs.
+# Not a copy of a global "pip freeze"; pip resolves the indirect dependencies.
+#
+# Keep this file ASCII-only. pip decodes a requirements file with the locale
+# encoding, so a non-ASCII byte breaks "pip install -r" on a cp949 Windows
+# shell. Korean setup instructions live in README.md instead.
+pytest==9.2.0
+ruff==0.17.5

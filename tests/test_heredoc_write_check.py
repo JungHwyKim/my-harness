@@ -94,7 +94,7 @@ BLOCKED_PS = [
     "@'\nhello\n'@ > out.md",
     # 공백 있는 따옴표 경로. **「`>` 뒤에 경로꼴을 요구」안이 여기서 죽었다** —
     # `'@` 를 거르려고 따옴표를 빼면 이 진짜 파일 쓰기가 함께 샌다
-    '@\'\nhello\n\'@ > "out file.md"',
+    "@'\nhello\n'@ > \"out file.md\"",
     # 본문이 빈 here-string 도 닫힌 것이다. 「못 찾음」으로 빠지면 이게 통과한다
     "@'\n'@ > out.md",
 ]
@@ -188,7 +188,9 @@ def test_tool_routing():
 
 
 # 훅을 실제로 실행해 확인한다. 판정 함수가 맞아도 배선이 틀리면 아무 소용이 없다
-def _run_hook(command: str, *, tool: str = "Bash", raw: bytes | None = None, env: dict | None = None):
+def _run_hook(
+    command: str, *, tool: str = "Bash", raw: bytes | None = None, env: dict | None = None
+):
     payload = (
         raw
         if raw is not None
@@ -239,9 +241,12 @@ def test_escape_hatch():
 # 조용히 통과하는데, 훅이 죽지도 경고를 내지도 않아 알아챌 방법이 없다.
 # `paid_test_check` 가 PowerShell 의 `Out-File -Encoding utf8` 로 실제로 겪은 자리다
 def test_bom_prefixed_input_is_still_judged():
-    raw = b"\xef\xbb\xbf" + json.dumps(
-        {"tool_name": "Bash", "tool_input": {"command": "cat > o.md <<'EOF'\nx\nEOF"}}
-    ).encode()
+    raw = (
+        b"\xef\xbb\xbf"
+        + json.dumps(
+            {"tool_name": "Bash", "tool_input": {"command": "cat > o.md <<'EOF'\nx\nEOF"}}
+        ).encode()
+    )
     proc = _run_hook("", raw=raw)
     assert b"deny" in proc.stdout
 

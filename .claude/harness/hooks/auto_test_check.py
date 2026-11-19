@@ -89,9 +89,11 @@ def _matches_tracked(path: str) -> bool:
             return True
     return False
 
+
 # 영역 테스트를 마지막으로 돌린 시각을 담는 마커. mtime 을 갱신해 쓴다.
 # file_path 가 없는 도구(Bash 등)로 고쳤을 때 "그 뒤로 무엇이 바뀌었나"의 기준이 된다
 CHECKED_NS = "claude_autotest_checked"
+
 
 # 경로 -> 테스트 대상. **최장 접두사가 이긴다** (loader/document 가 loader 보다 먼저).
 #
@@ -126,6 +128,7 @@ def _load_mappings() -> tuple[tuple[str, str], ...]:
 
 
 _MAPPINGS: tuple[tuple[str, str], ...] = _load_mappings()
+
 
 # **일부러 매핑하지 않는 것.** 여기 있는 경로는 전 영역에 영향을 주므로 부분 실행이
 # 무의미하다. 조용히 빠지는 게 아니라 "빠뜨린 게 아님"을 명시하는 자리다.
@@ -163,6 +166,14 @@ def test_target_for(raw_path: str) -> str | None:
     # conftest 처럼 test_ 로 시작하지 않는 것은 영향 범위가 넓어 전체 게이트로 넘긴다
     if rel.startswith("tests/"):
         name = rel.rsplit("/", 1)[-1]
+        # **`.py` 를 못 박는 것이 요점이다.** 위 이른 반환의 확장자 검사는 V1 에만 걸린다 —
+        # V2 는 `pyproject.toml` 처럼 .py 가 아닌 것도 매핑 표로 보내야 해서 그렇다. 그래서
+        # V2 에서는 `tests/__pycache__/test_x.cpython-312.pyc` 가 여기까지 와서 이름이
+        # `test_` 로 시작한다는 이유로 pytest 대상이 됐다. pytest 는 .pyc 를 수집하지 못해
+        # exit 4 로 죽고, 게이트는 «검사가 실패했다» 로 보인다(2026-11-18 실측).
+        # 진짜 원인은 `_hookutil` 의 산물 디렉터리 제외였고, 이 줄은 두 번째 방어선이다
+        if not name.endswith(".py"):
+            return None
         return rel if name.startswith("test_") else None
 
     # 최장 접두사가 이긴다

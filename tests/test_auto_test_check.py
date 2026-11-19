@@ -126,6 +126,25 @@ def test_editing_a_test_file_runs_that_file():
     assert auto_test_check.test_target_for(rel) == rel
 
 
+# `tests/` 아래의 .py 가 아닌 것은 대상이 아니다.
+#
+# 이름이 `test_` 로 시작한다는 이유로 `__pycache__` 의 .pyc 가 pytest 대상이 된 적이 있다.
+# pytest 는 .pyc 를 수집하지 못해 exit 4 로 죽고, 게이트는 «검사가 실패했다» 로 보인다 —
+# 고칠 코드가 없는데 모든 도구 호출마다 빨개지므로 SKIP_AUTOTEST=1 이 습관이 된다
+# (2026-11-18 실측: .pyc 15개). 산물 제외는 `_hookutil` 쪽이 먼저 막고 이것이 두 번째 선이다
+@pytest.mark.parametrize(
+    "path",
+    [
+        "tests/__pycache__/test_characters.cpython-312-pytest-9.2.0.pyc",
+        "tests/__pycache__/test_characters.cpython-311.pyc",
+        "tests/fixtures/test_sample.json",
+        "tests/test_characters.pyc",
+    ],
+)
+def test_non_python_under_tests_is_not_a_target(path: str):
+    assert auto_test_check.test_target_for(path) is None
+
+
 # 코드가 아닌 것에는 아무것도 안 돌린다. 문서를 고칠 때마다 테스트가 돌면 못 쓴다
 @pytest.mark.parametrize(
     "path",
@@ -286,7 +305,9 @@ def test_bash_call_without_edit_runs_nothing(tmp_path, monkeypatch) -> None:
     session = "sess-bash-noop"
     _hookutil.mark_session_start(session)
 
-    assert auto_test_check._targets_for_call({"tool_input": {"command": "git status"}}, session) == []
+    assert (
+        auto_test_check._targets_for_call({"tool_input": {"command": "git status"}}, session) == []
+    )
 
 
 # file_path 가 있으면 종전대로 그것 하나만 본다. 파일시스템을 훑지 않는다

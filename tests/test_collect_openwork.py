@@ -198,7 +198,9 @@ def test_v2_root_argument_uses_that_projects_wiki_root(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (backlog / "build.md").write_text("## Open\n\n- **Choose builder** — compare outputs\n", encoding="utf-8")
+    (backlog / "build.md").write_text(
+        "## Open\n\n- **Choose builder** — compare outputs\n", encoding="utf-8"
+    )
 
     result = oc.collect(tmp_path)
 
@@ -213,7 +215,9 @@ def _repo_with_followups(root: Path, bullets: str) -> Path:
     wiki = _wiki(root)
     (wiki / "plan_log").mkdir()
     (wiki / "task_log").mkdir()
-    (wiki / "plan_log" / "검색.md").write_text("## 미결\n\n- **a** — 정하려면: b\n", encoding="utf-8")
+    (wiki / "plan_log" / "검색.md").write_text(
+        "## 미결\n\n- **a** — 정하려면: b\n", encoding="utf-8"
+    )
     (wiki / "task_log" / "2026-08-07-세션.md").write_text(
         f"# 세션\n\n## 7. 남은 것\n\n{bullets}", encoding="utf-8"
     )
@@ -405,9 +409,7 @@ def test_renamed_heading_warns(tmp_path: Path) -> None:
     wiki = _wiki(tmp_path)
     (wiki / "plan_log").mkdir()
     (wiki / "task_log").mkdir()
-    (wiki / "plan_log" / "a.md").write_text(
-        "## 열린 질문\n\n- **x**\n", encoding="utf-8"
-    )
+    (wiki / "plan_log" / "a.md").write_text("## 열린 질문\n\n- **x**\n", encoding="utf-8")
     (wiki / "task_log" / "2026-08-01-b.md").write_text(
         "## 7. 남은 것\n\n- **y**\n", encoding="utf-8"
     )
@@ -428,7 +430,9 @@ def test_file_without_the_section_warns(fake_repo: Path) -> None:
 
 
 # 일부러 규약 밖인 파일은 경고하지 않는다. 면제가 없으면 경고가 상시가 되어 아무도 안 읽는다
-def test_sectionless_by_design_does_not_warn(fake_repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sectionless_by_design_does_not_warn(
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     name = "2026-08-08-일부러-다르다.md"
     monkeypatch.setitem(oc.SECTIONLESS_BY_DESIGN, name, "핸드오프 형식이라 절 구성이 다르다")
     (oc.folder_path(fake_repo, "task_log") / name).write_text(
@@ -468,9 +472,7 @@ def test_ungrouped_sorts_last(tmp_path: Path) -> None:
     wiki = _wiki(tmp_path)
     (wiki / "plan_log").mkdir()
     (wiki / "task_log").mkdir()
-    (wiki / "plan_log" / "히읗.md").write_text(
-        "## 미결\n\n- **x**\n", encoding="utf-8"
-    )
+    (wiki / "plan_log" / "히읗.md").write_text("## 미결\n\n- **x**\n", encoding="utf-8")
     (wiki / "task_log" / "2026-08-01-b.md").write_text(
         "## 7. 남은 것\n\n- **y**\n", encoding="utf-8"
     )

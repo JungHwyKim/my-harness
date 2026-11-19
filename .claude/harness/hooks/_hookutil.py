@@ -420,6 +420,35 @@ def clear_marker(namespace: str, session_id: str) -> None:
         return
 
 
+# 변경 탐지에서 빼는 디렉터리 이름. 도구가 만든 산물이라 «사람이 고친 파일»이 아니다.
+#
+# **빠지면 게이트가 스스로를 깨운다.** `tests/__pycache__/*.pyc`는 pytest가 돌 때마다 새로
+# 쓰인다. 그것이 변경으로 잡히면 다음 도구 호출이 또 Fast 게이트를 돌리고, 그 게이트가
+# 다시 pytest를 돌려 또 `.pyc`를 만든다. 2026-11-18에 실제로 그 모양으로 터졌다 —
+# `.pyc` 15개가 pytest 대상으로 넘어가 수집 실패(exit 4)가 나고, 그 뒤 모든 도구 호출마다
+# Fast 게이트가 실패했다. git을 쓰는 `changed_paths()`는 `.gitignore` 덕에 이 함정이 없고,
+# 파일시스템을 직접 훑는 이 두 함수에만 있다.
+#
+# **열거로 두는 이유는 이 저장소의 다른 예외 집합과 같다** — 빠뜨리면 못 걸러낼 뿐이고,
+# 잘못 걸러내는 일은 없다. `.gitignore`를 읽지 않는 것은 그 규칙이 이 판단보다 넓어서다.
+# 배포 산물이나 데이터를 무시하는 프로젝트에서는 사람이 고친 파일까지 빠진다
+_ARTIFACT_DIRS = frozenset(
+    {
+        "__pycache__",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        ".venv",
+        "node_modules",
+        ".git",
+    }
+)
+
+
+def _is_artifact(relative: Path) -> bool:
+    return any(part in _ARTIFACT_DIRS for part in relative.parts)
+
+
 # 기준 시각 이후에 바뀐 파일들의 저장소 기준 경로. 판단이 안 서면 None.
 #
 # `changed_paths()`(git)와 쓰임이 다르다. 저쪽은 "커밋 안 된 것"을 묻고 이쪽은 "이 시각
@@ -432,8 +461,12 @@ def paths_newer_than(prefixes: tuple[str, ...], since: float) -> list[str] | Non
             if not root.is_dir():
                 continue
             for path in root.rglob("*.py"):
-                if path.is_file() and path.stat().st_mtime > since:
-                    found.append(path.relative_to(PROJECT_ROOT).as_posix())
+                if not path.is_file() or path.stat().st_mtime <= since:
+                    continue
+                relative = path.relative_to(PROJECT_ROOT)
+                if _is_artifact(relative):
+                    continue
+                found.append(relative.as_posix())
     except OSError:
         return None
     return found
@@ -457,8 +490,12 @@ def tracked_paths_newer_than(entries: tuple[str, ...], since: float) -> list[str
                 if not path.is_dir():
                     continue
                 for child in path.rglob("*"):
-                    if child.is_file() and child.stat().st_mtime > since:
-                        found.append(child.relative_to(PROJECT_ROOT).as_posix())
+                    if not child.is_file() or child.stat().st_mtime <= since:
+                        continue
+                    relative = child.relative_to(PROJECT_ROOT)
+                    if _is_artifact(relative):
+                        continue
+                    found.append(relative.as_posix())
             elif path.is_file() and path.stat().st_mtime > since:
                 found.append(path.relative_to(PROJECT_ROOT).as_posix())
     except OSError:

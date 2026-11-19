@@ -43,6 +43,7 @@ import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+
 def _project_root() -> Path:
     raw = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     try:
@@ -296,9 +297,7 @@ def parse_file(path: Path, warnings: list[str]) -> list[Question]:
             (f.answer, f"꼬리답({f.question[:20]})") for f in item.followups
         ]:
             if body and re.search(r"^#{1,6}\s", body, re.M):
-                swallowed = next(
-                    ln for ln in body.splitlines() if re.match(r"^#{1,6}\s", ln)
-                )
+                swallowed = next(ln for ln in body.splitlines() if re.match(r"^#{1,6}\s", ln))
                 warnings.append(
                     f"{path.name}: 못 알아본 제목이 {where} 본문에 섞였습니다 — {swallowed[:60]}"
                 )
@@ -306,9 +305,7 @@ def parse_file(path: Path, warnings: list[str]) -> list[Question]:
             warnings.append(f"{path.name}: 답이 비었습니다 — {item.question[:40]}")
         for follow in item.followups:
             if not follow.answer:
-                warnings.append(
-                    f"{path.name}: 꼬리답이 비었습니다 — {follow.question[:40]}"
-                )
+                warnings.append(f"{path.name}: 꼬리답이 비었습니다 — {follow.question[:40]}")
 
     # **이정표를 조용히 버리지 않는다** — 가리키는 부록이 실재할 때만 버려도 되는 것이라,
     # 안 맞으면 문항 하나가 이유 없이 사라진 것이다

@@ -165,8 +165,7 @@ def test_non_shell_exceptions_are_wired_to_pretooluse():
 
     stale = NON_SHELL_PRETOOLUSE - wired
     assert not stale, (
-        f"NON_SHELL_PRETOOLUSE 의 {sorted(stale)} 가 PreToolUse 에 배선돼 있지 않다. "
-        "예외를 지워라"
+        f"NON_SHELL_PRETOOLUSE 의 {sorted(stale)} 가 PreToolUse 에 배선돼 있지 않다. 예외를 지워라"
     )
 
 
