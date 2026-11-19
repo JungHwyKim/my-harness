@@ -61,8 +61,7 @@
     },
     "expensive_tests": {
       "pytest_markers": [],
-      "reason": "이 프로젝트가 지정한 expensive test는 비용 또는 긴 실행 시간이 발생합니다.",
-      "allow_env": "ALLOW_PAID_TESTS"
+      "reason": "이 프로젝트가 지정한 expensive test는 비용 또는 긴 실행 시간이 발생합니다."
     }
   }
 }
