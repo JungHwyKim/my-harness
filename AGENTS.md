@@ -1,56 +1,57 @@
-# Codex Working Guide
+# Codex 작업 지침
 
-## Start Here
+## 시작하기
 
-- Before starting work, read `CLAUDE.md` and follow its **Global Rules**,
-  **Context Router**, and **Information Ownership** sections.
-- This file is the Codex entry point. `CLAUDE.md` remains the shared source for
-  project-wide context; do not copy its contents here.
+- 작업을 시작하기 전에 `CLAUDE.md`를 읽고 **Global Rules**, **Context Router**,
+  **Information Ownership** 항목을 따른다.
+- 이 파일은 Codex의 진입점이다. 프로젝트 공통 맥락의 기준은 `CLAUDE.md`이며,
+  그 내용을 이 파일에 복사하지 않는다.
 
-## Context Loading
+## 맥락 읽기
 
-Load only the context needed for the task, in this order:
+작업에 필요한 맥락만 다음 순서로 읽는다.
 
-1. Read `.claude/wiki/overview/README.md` to orient yourself in the project.
-2. Read the relevant document under `.claude/wiki/knowledge/` for current
-   contracts and behavior.
-3. Read `.claude/wiki/history/` only when the reason for an earlier decision is
-   necessary to make a safe change.
-4. For a matching repeatable workflow, read its `.claude/skills/<name>/SKILL.md`
-   before using that workflow.
+1. `.claude/wiki/overview/README.md`에서 프로젝트 구조를 확인한다.
+2. `.claude/wiki/knowledge/`의 관련 문서에서 현재 유효한 계약과 동작을 확인한다.
+3. 안전하게 변경하기 위해 과거 결정의 이유가 필요한 경우에만
+   `.claude/wiki/history/`를 읽는다.
+4. 작업에 맞는 반복 절차가 있으면 실행 전에 해당
+   `.claude/skills/<name>/SKILL.md`를 읽는다.
 
-Do not load all wiki or history documents by default.
+전체 wiki나 history 문서를 기본 맥락으로 읽지 않는다.
 
-## Quality Gate
+## 품질 검증
 
-- Claude Code hooks in `.claude/settings.json` do not run automatically in
-  Codex.
-- After changing code or harness configuration, manually run the applicable
-  Quality Profile from `.claude/harness.json`:
-  - `fast`: after a scoped change, run the affected tests.
-  - `full`: before completion or commit, run lint, format check, and the full
-    test suite when the change warrants it.
-- Report any check that was not run and why.
+- `.claude/settings.json`의 Claude Code 훅은 Codex에서 자동으로 실행되지 않는다.
+- 코드나 하네스 설정을 변경한 뒤에는 `.claude/harness.json`에 정의된
+  해당 Quality Profile을 수동으로 실행한다.
+  - `fast`: 범위가 한정된 변경 후 영향받는 테스트를 실행한다.
+  - `full`: 완료 또는 커밋 전에 변경의 성격에 따라 린트, 포맷 검사,
+    전체 테스트를 실행한다.
+- 실행하지 않은 검사와 그 이유를 보고한다.
 
-## Instruction Ownership
+## 작업 인수인계
 
-Keep `AGENTS.md` under 120 lines. It may contain only durable, repository-wide
-rules and routes to their source documents.
+- Claude Code와 작업을 주고받을 때는 `CLAUDE.md`의 작업 인수인계 경로를 따른다.
 
-Before adding a rule here, confirm all three:
+## 지침의 소유 위치
 
-1. It applies to most tasks.
-2. It must be known before opening task-specific documentation.
-3. It is likely to remain true for at least three months.
+`AGENTS.md`는 120줄 미만으로 유지한다. 오래 유지되는 저장소 공통 규칙과
+원본 문서로 가는 경로만 둔다.
 
-If any answer is no, put the information in its proper owner instead:
+규칙을 추가하기 전에 다음 세 조건을 모두 확인한다.
 
-- Current module contract: `.claude/wiki/knowledge/`
-- Project map: `.claude/wiki/overview/`
-- Decision rationale: `.claude/wiki/history/`
-- Repeatable multi-step procedure: `.claude/skills/`
-- Commands and quality configuration: `.claude/harness.json` or its scripts
-- Temporary incident workaround: an issue, plan, task log, or pull request
+1. 대부분의 작업에 적용되는가?
+2. 작업별 문서를 열기 전에 알아야 하는가?
+3. 최소 3개월 이상 유효할 것으로 예상되는가?
 
-Link to the source of truth; never duplicate long procedures, checklists, or
-module-specific rules in this file.
+하나라도 해당하지 않으면 적절한 소유 위치에 기록한다.
+
+- 현재 모듈 계약: `.claude/wiki/knowledge/`
+- 프로젝트 지도: `.claude/wiki/overview/`
+- 결정의 이유: `.claude/wiki/history/`
+- 반복되는 다단계 절차: `.claude/skills/`
+- 명령과 품질 설정: `.claude/harness.json` 또는 관련 스크립트
+- 임시 문제 대응: 이슈, 계획, 작업 로그 또는 풀 리퀘스트
+
+원본 문서로 연결하고, 긴 절차나 체크리스트 또는 모듈별 규칙을 이 파일에 중복하지 않는다.
