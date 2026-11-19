@@ -58,10 +58,10 @@ Profile이 돌린다. 설치 절차 자체는 `README.md`의 「검증과 주의
 | Full 세 단계 | `ruff check` 통과, `ruff format --check`는 70 files already formatted, **405 passed**(8.32초) | 2026-11-20, Claude가 세 단계를 재실행해 보고. Codex는 이번 검토에서 재실행하지 않았다 |
 
 **환경 구축 성공과 Full 통과는 따로 판정한다.** 위 수치를 이 문서에 적은 것은 실행 증거가
-임시 파일에만 남지 않게 하기 위해서다. 설치 자체의 실행 기록은 `tasks/handoff.review.md`의
-Round 2와 마지막 `F6 closed` 절에 있고 그 파일은 정리 대상이다. 지워진 뒤에는 보존 커밋에서
-읽는다 — 그 파일을 담은 현재 마지막 커밋은 `07bd76e`이고, 나중에 찾을 때는
-`git log --all -- tasks/handoff.review.md`를 쓴다.
+임시 파일에만 남지 않게 하기 위해서다. 설치 자체의 실행 기록은 인수인계 절차의 임시 리뷰에
+있고, 그 파일은 정리되면 사라지므로 보존 커밋에서 읽는다 —
+`git show 07bd76e:tasks/handoff.review.md`의 Round 2와 마지막 `F6 closed` 절이다. 경로로
+다시 찾을 때는 `git log --all -- tasks/handoff.review.md`를 쓴다.
 
 ## 보장하지 않는 것
 

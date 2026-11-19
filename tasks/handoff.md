@@ -1,8 +1,57 @@
 # Codex ↔ Claude Handoff — Revised Proposal
 
-Status: workflow installed per `tasks/handoff.review.md`; verification-environment
-and reusable-template preparation authorized for Claude Code. Full verification,
-template cleanup, and final review pending.
+- 상태: 구현 완료 · Codex 최종 리뷰 승인 · 보존/정리 대기
+- 명세: `tasks/handoff.md`
+- 리뷰: `tasks/handoff.review.md`
+
+## Codex 최종 리뷰 — 승인 (2026-11-20)
+
+확인 기준은 `C:\my-harness`, `main` / `c433850`과 현재 작업 트리다.
+`handoff.review.md`의 누적 보고와 실제 설치 결과를 아래 Installation done criteria에
+대조했다. **인수인계 절차 구현은 완료됐으며, 차단 지적 없이 8단계 리뷰를 승인한다.**
+보존과 임시 파일 정리는 아직 끝나지 않았다.
+
+| 완료 기준 | 확인 결과 |
+|---|---|
+| 한국어 공통 절차와 명세 템플릿 | 두 파일이 존재하며 소유, 언어, 작업 ID, 구현·검증, 재수정·모델 상향, 보존·정리 조건을 담고 있다. 템플릿 소유자는 Codex다 |
+| 진입점 연결과 길이 제한 | `CLAUDE.md`와 `AGENTS.md`가 공통 절차로 연결된다. 관련 경로가 존재하며 `AGENTS.md`는 57줄이다 |
+| 설계부터 정리까지 연속된 절차 | 1~9단계와 같은 ID 명세에 리뷰 결과를 기록하는 규칙이 있다. 미보존 파일을 완료 정리할 수 없도록 명시돼 있다 |
+| 설치와 검증 보고 | 원래 보고의 환경 미설치·Full 실패는 후속 작업으로 해소됐다. `tasks/quality-env-setup.review.md`의 2026-11-20 재실행 보고는 lint·format 통과, pytest **405 passed**다 |
+| 훅 작업 분리 | 훅 수정은 별도 작업에서 완료됐고 현재 계약은 `.claude/wiki/knowledge/paid-test-approval.md`에 있다. 이번 리뷰에서 훅 코드를 변경하지 않았다 |
+
+기존 보고의 지적은 현재 상태를 다음과 같이 판정한다. 과거 라운드의 미해결 문구를
+현재 차단 사항으로 다시 적용하지 않는다.
+
+| 지적 | 현재 판정 |
+|---|---|
+| F1: 추적되지 않은 작업 파일 | 기존 명세·리뷰와 영구 템플릿은 현재 Git에 추적·보존돼 있다. 이번 최종 판정의 보존은 별도로 남는다 |
+| F2: 템플릿 소유자 불명확 | 공통 절차와 템플릿 모두 Codex 소유로 명시됐다 |
+| F3: `hook-dicision.md` 철자 | 해당 임시 파일 쌍은 이미 보존 후 삭제됐다. 아래 링크는 과거 설계의 참조이며 재생성·이름 변경할 대상이 아니다 |
+| F4: 절차의 소유 위치 누락 | `CLAUDE.md`의 Information Ownership에 `.claude/skills/`가 포함돼 있다 |
+| F5·F6: lint·format·테스트 실패 | 해소됐다. 최신 Full 성공 근거는 위 환경 검증 보고다 |
+| F7: 작업 ID 없이 수행한 과거 라운드 | 이력상 예외로 남긴다. 현재 절차는 기존 인수인계를 소급 개명하지 않으며, 새 작업은 고유 ID를 사용한다. 현재 구현의 차단 결함은 아니다 |
+
+환경 계약은 `.claude/wiki/knowledge/quality-env.md`, 템플릿 배포 계약은
+`.claude/wiki/knowledge/template-deploy.md`에 보존됐다. 템플릿 준비 후속 작업은
+승인·보존 후 `c433850`에서 임시 파일 정리까지 끝났다. 실제 `template/<version>` ref의
+생성·배포는 별도 실행 단계이며 이번 인수인계 구현의 미완료 항목이 아니다.
+Ruff `I`·`RUF100` 추가도 별도 선택 사항이다.
+
+남은 9단계 작업은 다음과 같다.
+
+1. 이번 최종 판정까지 커밋하거나 필요한 내용을 영구 문서에 보존한다.
+2. 삭제 전에 `quality-env.md`와 `quality-env-setup.md` 등에서 이 명세·리뷰를 가리키는
+   현재 근거를 보존된 커밋 경로 또는 보존을 마친 후속 보고로 바꾼다.
+3. 보존 조건을 확인한 뒤 Claude가 이 임시 명세·리뷰 쌍을 정리한다. 별도 환경 작업의
+   새 리뷰는 아직 untracked이므로 그 작업의 승인 기록과 함께 보존한 뒤 따로 정리한다.
+
+이번 Codex 확인은 문서·경로·소유권·Git 상태 대조와 `git diff --check`다.
+코드나 하네스 설정을 변경하지 않아 Fast 대상이 없으며 Full을 재실행하지 않았다.
+위 405개 테스트 결과는 Claude의 최신 실행 보고를 검토한 근거다.
+
+아래는 설치 당시 설계와 이관 전 요구사항의 기록이다. 현재 계약은 공통 절차와 위
+Knowledge 문서를 따른다. 특히 아래의 History 초기화 요구를 `main`에 적용하지 않는다.
+`main`은 History를 유지하고 배포용 ref만 비운다는 후속 결정이 이를 대체했다.
 
 ## Purpose and scope
 
