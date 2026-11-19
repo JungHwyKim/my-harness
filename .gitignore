@@ -8,6 +8,8 @@ __pycache__/
 #
 # 아래 둘은 **의도적으로 뺀 것**이고, 아직 `git add` 하지 않은 것이 아니다. 둘을 가른
 # 이유와 기각한 대안은 `.claude/wiki/history/plan/2026-11-19-codex-dir-tracking.md`에 있다.
+# 템플릿으로 배포한 사본에는 그 기록이 없으므로 보존 커밋에서 읽는다 —
+# `git show bfeb428:.claude/wiki/history/plan/2026-11-19-codex-dir-tracking.md`.
 #
 # `.agents/` — `.claude/skills/`의 낡은 사본이다. `.claude/`를 `.Codex/`로 치환한 흔적이
 #   45곳 남아 `.codex/harness.json`·`.codex/wiki/`처럼 없는 경로를 가리킨다. Codex의

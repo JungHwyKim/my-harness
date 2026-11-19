@@ -6,16 +6,46 @@ Claude Code 프로젝트에 그대로 복사해 쓰는 개인용 개발 하네�
 
 ## 빠른 시작
 
+길이 둘이다. 새 프로젝트를 이 저장소로 시작하거나, 이미 있는 프로젝트에 하네스만
+가져온다.
+
+### 새 프로젝트로 시작
+
 ```powershell
 git clone https://github.com/JungHwyKim/my-harness <your_dir>
 ```
 
-기존 프로젝트에 적용할 때는 이 저장소의 `CLAUDE.md`와 `.claude/`를 가져온다. Codex도
-함께 쓴다면 `AGENTS.md`도 가져온다. 기존 `CLAUDE.md`, `AGENTS.md`,
-`.claude/settings.json`이 있다면 덮어쓰지 말고, 프로젝트의 규칙과 `hooks` 항목을
-병합한다.
+`main`을 그대로 clone 하면 `.claude/wiki/history/`에 **이 하네스를 개발하면서 쌓인
+기록**이 들어 있다. 새 프로젝트에서는 그것을 지우고 시작한다 — 공통 README와 세 하위
+폴더의 `.gitkeep`만 남긴다. 지운 기록의 내용은 이 저장소의 커밋에 그대로 있어
+`git show <커밋>:<경로>`로 읽는다. 템플릿용 ref를 따로 배포한 경우에는 그 ref의 History가
+이미 비어 있으니 지울 것이 없다.
 
-적용 직후에는 아래 네 곳을 프로젝트에 맞게 수정한다.
+배포용 ref는 `template/<버전>` 이름을 쓴다 — `main`에서 끊어 History만 비운 스냅샷이다.
+그 ref가 있으면 거기서 바로 받고 지울 것이 없다.
+
+```powershell
+git clone --branch template/v2.1 --depth 1 https://github.com/JungHwyKim/my-harness <your_dir>
+```
+
+`--depth 1`은 커밋 이력까지 따라오지 않게 한다. 배포 ref는 `main`으로 병합하지 않는다 —
+기록을 지운 커밋이 `main`에 섞인다.
+
+이 프로젝트가 앞으로 만드는 기록은 기존 Plan·Task·Verify 절차대로 쌓인다.
+
+가상환경은 저장소마다 새로 만든다. 아래 「검증과 주의 사항」의 설치 명령을 따른다.
+
+### 기존 프로젝트에 적용
+
+이 저장소의 `CLAUDE.md`와 `.claude/`를 가져온다. Codex도 함께 쓴다면 `AGENTS.md`도
+가져온다. 기존 `CLAUDE.md`, `AGENTS.md`, `.claude/settings.json`이 있다면 덮어쓰지 말고,
+프로젝트의 규칙과 `hooks` 항목을 병합한다.
+
+대상 프로젝트의 파일은 덮어쓰지 않는다. `requirements.txt`가 이미 있으면 하네스의 의존성
+목록은 `requirements-harness.txt`처럼 다른 이름으로 가져와 검증 도구만 설치한다. 기존
+가상환경과 pytest 설정, `.claude/wiki/`에 이미 있는 기록도 그대로 둔다.
+
+### 적용 직후 고칠 네 곳
 
 1. `CLAUDE.md` — 프로젝트 목적과 항상 지켜야 할 공통 규칙
 2. `.claude/harness.json` — Python 경로, 소스·테스트 경로, Quality Profile
@@ -24,6 +54,23 @@ git clone https://github.com/JungHwyKim/my-harness <your_dir>
 
 Claude Code는 프로젝트의 `.claude/settings.json`에서 훅을,
 `.claude/skills/<이름>/SKILL.md`에서 프로젝트 스킬을 읽는다.
+
+### 무엇이 따라오고 무엇이 안 따라오는가
+
+| 가져온다 | 가져오지 않는다 |
+|---|---|
+| `CLAUDE.md`·`AGENTS.md` 진입점 | `.venv/`와 설치된 패키지 — 프로젝트마다 다시 만든다 |
+| `.claude/` 전체 — 설정·훅·스킬·Wiki 구조 | `.agents/`·`.codex/` — 다른 에이전트용 로컬 사본 |
+| `requirements.txt` — 하네스의 검증 도구 목록 | 하네스를 개발하며 쌓인 Plan·Task·Verify 기록 |
+| `tasks/_template.md` — 작업 명세 템플릿 | 끝난 작업의 임시 명세와 리뷰 |
+| `.claude/wiki/knowledge/`의 현재 계약 | 대상 프로젝트에 이미 있는 파일 |
+
+`requirements.txt`의 `pytest`·`ruff`는 **이 저장소를 개발하고 검증하는** 도구다. 대상
+프로젝트의 제품 의존성도 아니고, 모든 프로젝트가 꼭 써야 하는 품질 도구도 아니다. 다른
+언어 프로젝트는 `.claude/harness.json`의 Quality Profile을 그 언어의 도구로 바꾼다.
+
+History를 `.gitignore`로 막지 않는다. 비어 있는 것은 초기 상태이고, 기록을 남기지 않는
+정책이 아니다.
 
 ## Codex와 함께 사용
 
@@ -114,6 +161,7 @@ Full Quality Profile의 세 단계는 직접 실행할 수 있다.
   Profile의 명령을 사용하는 도구에 맞게 바꾼다.
 - `history/`는 이슈 트래커나 전체 백로그가 아니다. 열린 작업은
   `checks.openwork.sources`에 별도 정보원을 지정해 관리한다.
+
 ## 유료·외부 테스트 보호
 
 비용이 드는 테스트는 **세 곳을 함께** 설정해야 보호된다. 하나만 하면 나머지 경로로 그냥
@@ -149,7 +197,3 @@ Full Quality Profile의 세 단계는 직접 실행할 수 있다.
 승인창을 보장할 수 없는 권한 모드(`bypassPermissions` 등)와 모드를 읽지 못한 경우에는
 승인 대신 차단한다. 자세한 계약과 한계는
 `.claude/wiki/knowledge/paid-test-approval.md`에 있다.
-
-- 기존 프로젝트에 가져올 때는 그 프로젝트의 `requirements.txt`·pytest 설정·가상환경을
-  덮어쓰지 않는다. 하네스의 의존성 파일은 `requirements-harness.txt`처럼 별도 이름으로
-  가져온다.
