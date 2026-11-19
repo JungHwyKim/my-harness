@@ -37,7 +37,8 @@ git clone --branch template/v2.1 --depth 1 https://github.com/JungHwyKim/my-harn
 - `git fetch --unshallow`로 이력을 받은 뒤 `git show <커밋>:<경로>`를 쓴다. 배포 ref에서
   이어지는 조상 커밋이 함께 따라온다.
 
-배포 ref는 `main`으로 병합하지 않는다 — 기록을 지운 커밋이 `main`에 섞인다.
+배포 ref는 `main`으로 병합하지 않는다 — 기록을 지운 커밋이 `main`에 섞인다. ref를 끊는
+쪽의 계약은 `.claude/wiki/knowledge/template-deploy.md`에 있다.
 
 이 프로젝트가 앞으로 만드는 기록은 기존 Plan·Task·Verify 절차대로 쌓인다.
 
@@ -169,6 +170,9 @@ Full Quality Profile의 세 단계는 직접 실행할 수 있다.
   Profile의 명령을 사용하는 도구에 맞게 바꾼다.
 - `history/`는 이슈 트래커나 전체 백로그가 아니다. 열린 작업은
   `checks.openwork.sources`에 별도 정보원을 지정해 관리한다.
+
+Profile이 무엇을 보장하고 무엇을 보장하지 않는지는
+`.claude/wiki/knowledge/quality-env.md`에 있다.
 
 ## 유료·외부 테스트 보호
 
