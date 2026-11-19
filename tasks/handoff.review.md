@@ -375,3 +375,26 @@ current files before relying on it, so this is a re-read, not a rewrite.
    unblocked.
 5. Adding `I` (import sorting) and `RUF100` to the Ruff selection costs four
    auto-fixes and is a separate, deliberate decision.
+
+
+# F6 closed — and its owner is gone
+
+F6 was the 14 failures in `tests/test_paid_test_check.py`, left to the hook task
+because fixing them here would have collided with `tasks/hook-dicision.md` item
+6. That task has since run and been approved: the tests inject a two-marker
+config through the `two_marker_hook` fixture instead of asserting detection
+against the template's empty `checks.expensive_tests.pytest_markers`, and the
+hook returns early when no marker is configured. The Full gate is green —
+`ruff check`, `ruff format --check`, **405 passed** — so "every turn still ends
+red until that task runs", above, no longer holds.
+
+`tasks/hook-dicision.md` and `tasks/hook-dicision.review.md` were removed under
+step 9 of the handoff procedure once their content was committed, so the
+references to them in this file now point at deleted paths. They are readable
+in the commits (`860fd7b`, `03bbc02` and the removal commit); the durable record
+is `.claude/wiki/knowledge/paid-test-approval.md` for the current contract and
+`.claude/wiki/history/plan/2026-11-19-paid-hook-comment-stripping.md` for the
+decision.
+
+Nothing else in this task's findings changes. F1, F2, F7 and the Ruff
+`I`/`RUF100` decision stand as written.
