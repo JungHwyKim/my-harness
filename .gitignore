@@ -2,3 +2,21 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.venv/
+
+# 다른 에이전트용 로컬 사본은 배포하지 않는다.
+#
+# 아래 둘은 **의도적으로 뺀 것**이고, 아직 `git add` 하지 않은 것이 아니다. 둘을 가른
+# 이유와 기각한 대안은 `.claude/wiki/history/plan/2026-11-19-codex-dir-tracking.md`에 있다.
+#
+# `.agents/` — `.claude/skills/`의 낡은 사본이다. `.claude/`를 `.Codex/`로 치환한 흔적이
+#   45곳 남아 `.codex/harness.json`·`.codex/wiki/`처럼 없는 경로를 가리킨다. Codex의
+#   진입점인 `AGENTS.md`는 `.claude/skills/<이름>/SKILL.md`를 읽으므로 참조되지도 않는다.
+# `.codex/` — `hooks.json`이 `.claude/settings.json`의 훅 배선을 그대로 중복한다. 그런데
+#   `AGENTS.md`와 `README.md`는 Codex에서 그 훅이 자동 실행되지 않고 Quality Profile을
+#   직접 실행한다고 명시한다. 추적하면 같은 사실을 두 파일이 서로 다르게 들고 있게 된다.
+#
+# 대신 Codex의 훅 설정은 머신마다 따로 두고 저장소에서 리뷰할 수 없다. 그 비용은 받아들였다.
+# 배포 대상 전반은 `tasks/template-history-cleanup.md`가 소유한다.
+.agents/
+.codex/

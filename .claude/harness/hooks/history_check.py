@@ -28,7 +28,9 @@ ASSESSED_NS = "claude_history_assessed"
 EXPECTED_NS = {kind: f"claude_history_expected_{kind}" for kind in RECORD_SKILLS.values()}
 WRITTEN_NS = {kind: f"claude_history_written_{kind}" for kind in RECORD_SKILLS.values()}
 ASSESS_BLOCKED_NS = "claude_history_assessment_blocked"
-RECORD_BLOCKED_NS = {kind: f"claude_history_record_blocked_{kind}" for kind in RECORD_SKILLS.values()}
+RECORD_BLOCKED_NS = {
+    kind: f"claude_history_record_blocked_{kind}" for kind in RECORD_SKILLS.values()
+}
 
 
 def _history_section() -> dict:
@@ -144,7 +146,9 @@ def _handle_stop(payload: dict, session_id: str, *, trust_mtime: bool) -> None:
                 _hookutil.claim_session(WRITTEN_NS[kind], session_id)
 
     expected = tuple(
-        kind for kind, namespace in EXPECTED_NS.items() if _hookutil.is_marked(namespace, session_id)
+        kind
+        for kind, namespace in EXPECTED_NS.items()
+        if _hookutil.is_marked(namespace, session_id)
     )
     changes = _session_changes(session_id)
     if not changes and not expected:

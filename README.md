@@ -88,14 +88,68 @@ V1과 V2 모두 프로젝트에 복사해 쓰지만, V2는 Context와 기록의 
 
 ## 검증과 주의 사항
 
+개발 의존성은 저장소 전용 가상환경에 둔다. `.claude/harness.json`의 `python`이
+`.venv/Scripts/python.exe`를 가리키므로, 그 자리에 환경이 없으면 Quality Profile이 다른
+인터프리터로 조용히 대체된다.
+
 ```powershell
-python -m pytest tests -q
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip check
 ```
 
+Full Quality Profile의 세 단계는 직접 실행할 수 있다.
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m ruff format --check .
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+- `.venv/`는 Git 관리 대상이 아니다. 개발 의존성은 `requirements.txt`에 버전을 고정한다.
+- `requirements.txt`는 ASCII로 유지한다. pip가 그 파일을 로케일 인코딩으로 읽어서,
+  한국어 주석을 넣으면 cp949 환경에서 `pip install -r`가 실패한다.
 - `.claude/settings.local.json`은 개인 설정이므로 커밋하지 않는다.
 - `.claude/harness.json`의 예시는 Python 프로젝트 기준이다. 다른 언어에서는 Quality
   Profile의 명령을 사용하는 도구에 맞게 바꾼다.
 - `history/`는 이슈 트래커나 전체 백로그가 아니다. 열린 작업은
   `checks.openwork.sources`에 별도 정보원을 지정해 관리한다.
-- 유료·외부·장시간 테스트는 `checks.expensive_tests`에 명시하고, 실행 전 사용자 승인을
-  받는다.
+## 유료·외부 테스트 보호
+
+비용이 드는 테스트는 **세 곳을 함께** 설정해야 보호된다. 하나만 하면 나머지 경로로 그냥
+실행된다.
+
+1. `.claude/harness.json`의 `checks.expensive_tests.pytest_markers`에 유료 마커를
+   등록한다. 이 저장소는 제품 테스트가 없어 `[]`이고, 빈 목록이면 비용 훅은 아무것도
+   감지하지 않는다.
+2. 프로젝트의 pytest 기본 설정에서 그 마커를 **모두** 제외한다. 그래야 마커를 지정하지
+   않은 `pytest -q`가 유료 테스트를 수집하지 않는다.
+
+   ```toml
+   # pyproject.toml
+   [tool.pytest.ini_options]
+   addopts = "-m 'not paid and not paid2'"
+   markers = ["paid: 외부 API 과금", "paid2: 다른 과금 경로"]
+   ```
+
+3. Quality Profile의 `argv`에도 같은 제외를 적는다. Fast·Full 단계는 훅 안에서 pytest를
+   자식 프로세스로 띄우므로 `PreToolUse` 승인을 거치지 않는다. 기본 설정과 별도로 실행
+   명령 자체를 안전하게 만들어야 한다.
+
+   ```json
+   "argv": ["{python}", "-m", "pytest", "-m", "not paid and not paid2", "-q"]
+   ```
+
+비용 훅은 이 설정을 전제로 **명령줄이 그 제외를 덮는지**만 본다. 명령줄 `-m`이 있으면
+설정된 모든 유료 마커를 AND 조건으로 빼는 것이 증명되는 단순 식만 통과한다. `or`·괄호·
+다른 설정 파일(`-c`)은 승인을 요청한다. `-o addopts` 덮어쓰기도 모든 유료 마커의 제외를
+증명할 수 없으면 승인을 요청한다. 승인은 그 도구 호출 하나에만 적용되고 **환경변수로
+세션 전체를 허용하는 우회는 없다.**
+
+승인창을 보장할 수 없는 권한 모드(`bypassPermissions` 등)와 모드를 읽지 못한 경우에는
+승인 대신 차단한다. 자세한 계약과 한계는
+`.claude/wiki/knowledge/paid-test-approval.md`에 있다.
+
+- 기존 프로젝트에 가져올 때는 그 프로젝트의 `requirements.txt`·pytest 설정·가상환경을
+  덮어쓰지 않는다. 하네스의 의존성 파일은 `requirements-harness.txt`처럼 별도 이름으로
+  가져온다.

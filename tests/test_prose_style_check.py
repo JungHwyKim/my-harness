@@ -181,16 +181,25 @@ def test_a_repeated_idiom_is_counted() -> None:
 
 
 def test_watched_paths_are_in_scope() -> None:
-    for rel in ("CLAUDE.md", "AGENTS.md", ".claude/wiki/plan_log/x.md",
-                "rag_pipeline/query.py", "tests/hooks/test_x.py"):
+    for rel in (
+        "CLAUDE.md",
+        "AGENTS.md",
+        ".claude/wiki/plan_log/x.md",
+        "rag_pipeline/query.py",
+        "tests/hooks/test_x.py",
+    ):
         assert not hook.out_of_scope(rel), rel
 
 
 # 사람이 검수한 라벨과 승인된 기대값은 산문이 아니라 데이터다.
 # 세기 시작하면 «라벨을 고쳐라» 로 읽히는데 그것이 검수 도장을 깨뜨린다
 def test_label_data_is_out_of_scope() -> None:
-    for rel in ("evaluation/qa_set.jsonl", "evaluation/qa_set_human.jsonl",
-                "evaluation/paraphrase_pairs.jsonl", "regression/baseline.json"):
+    for rel in (
+        "evaluation/qa_set.jsonl",
+        "evaluation/qa_set_human.jsonl",
+        "evaluation/paraphrase_pairs.jsonl",
+        "regression/baseline.json",
+    ):
         assert hook.out_of_scope(rel), rel
 
 
@@ -263,7 +272,9 @@ def test_the_hook_never_blocks() -> None:
 
 # 파일이 없어도 돈다 — 새 파일을 만드는 `Write` 가 그 경우다
 def test_a_missing_file_still_reports() -> None:
-    proc = _run(str(PROJECT_ROOT / ".claude/wiki/task_log/2099-01-01-없는파일.md"), "두 판을 견줬다")
+    proc = _run(
+        str(PROJECT_ROOT / ".claude/wiki/task_log/2099-01-01-없는파일.md"), "두 판을 견줬다"
+    )
 
     assert proc.returncode == 0
     assert "낱말 판 1" in proc.stdout.decode("utf-8")

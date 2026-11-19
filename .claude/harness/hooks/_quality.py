@@ -74,7 +74,9 @@ def _stage_cwd(raw: object, stage_id: str) -> Path:
     if raw is None:
         return _hookutil.PROJECT_ROOT
     if not isinstance(raw, str) or not raw.strip():
-        raise QualityConfigError(f"quality stage {stage_id!r}의 cwd는 비어 있지 않은 문자열이어야 합니다.")
+        raise QualityConfigError(
+            f"quality stage {stage_id!r}의 cwd는 비어 있지 않은 문자열이어야 합니다."
+        )
     candidate = (_hookutil.PROJECT_ROOT / raw).resolve()
     try:
         candidate.relative_to(_hookutil.PROJECT_ROOT.resolve())
@@ -101,23 +103,35 @@ def load_profile(name: str) -> tuple[Stage, ...]:
     seen: set[str] = set()
     for index, raw in enumerate(raw_stages):
         if not isinstance(raw, dict):
-            raise QualityConfigError(f"quality profile {name!r}의 {index + 1}번째 stage가 객체가 아닙니다.")
+            raise QualityConfigError(
+                f"quality profile {name!r}의 {index + 1}번째 stage가 객체가 아닙니다."
+            )
         stage_id = raw.get("id")
         if not isinstance(stage_id, str) or not stage_id.strip():
             raise QualityConfigError(f"quality profile {name!r}의 stage id가 비어 있습니다.")
         stage_id = stage_id.strip()
         if stage_id in seen:
-            raise QualityConfigError(f"quality profile {name!r}에 stage id {stage_id!r}가 중복됩니다.")
+            raise QualityConfigError(
+                f"quality profile {name!r}에 stage id {stage_id!r}가 중복됩니다."
+            )
         seen.add(stage_id)
 
         argv = raw.get("argv")
-        if not isinstance(argv, list) or not argv or not all(isinstance(item, str) for item in argv):
-            raise QualityConfigError(f"quality stage {stage_id!r}의 argv는 문자열 배열이어야 합니다.")
+        if (
+            not isinstance(argv, list)
+            or not argv
+            or not all(isinstance(item, str) for item in argv)
+        ):
+            raise QualityConfigError(
+                f"quality stage {stage_id!r}의 argv는 문자열 배열이어야 합니다."
+            )
         if not argv[0].strip():
             raise QualityConfigError(f"quality stage {stage_id!r}의 실행 파일이 비어 있습니다.")
         for arg in argv:
             if arg.startswith("{") and arg.endswith("}") and arg not in _KNOWN_PLACEHOLDERS:
-                raise QualityConfigError(f"quality stage {stage_id!r}에 알 수 없는 치환값이 있습니다: {arg}")
+                raise QualityConfigError(
+                    f"quality stage {stage_id!r}에 알 수 없는 치환값이 있습니다: {arg}"
+                )
 
         timeout = raw.get("timeout", DEFAULT_TIMEOUT_SEC)
         if not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 3600:

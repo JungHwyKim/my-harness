@@ -206,9 +206,7 @@ def count(text: str) -> dict[str, int]:
 def report(rel: str, found: dict[str, int]) -> str:
     parts = ", ".join(f"{name} {n}" for name, n in found.items())
     return (
-        f"[산문 검사] {rel} — {parts}. "
-        f"규칙: {RULE_REFERENCE}. "
-        "옛 기록을 인용한 것이면 그대로 둔다"
+        f"[산문 검사] {rel} — {parts}. 규칙: {RULE_REFERENCE}. 옛 기록을 인용한 것이면 그대로 둔다"
     )
 
 

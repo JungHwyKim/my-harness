@@ -191,6 +191,7 @@ def not_a_source_for(root: Path) -> dict[str, str]:
         "history": "중요한 과거 이유",
     }
 
+
 # **미완 절이 없는데 일부러 그런 파일.** 폴더 전체가 0건일 때만 시끄러우면 **파일 하나가 절을
 # 빠뜨린 것은 조용하고**, 그 파일의 남은 일이 통째로 0건으로 빠진다 — 실측으로
 # `2026-08-29-리랭커-점수분포.md` 가 절 번호를 `5. 남은 것` 으로 달아 5건을 한 달 동안
@@ -221,6 +222,7 @@ def _config_sectionless(root: Path) -> dict[str, str]:
     if not isinstance(values, dict):
         return {}
     return {k: v for k, v in values.items() if isinstance(k, str)}
+
 
 _CLOSED = "~~"
 
@@ -514,11 +516,15 @@ def collect(root: Path | None = None) -> dict:
         }
 
     feature_source = next((source for source in sources if source.file_is_feature), None)
-    features = sorted(
-        p.stem
-        for p in folder_path(root, feature_source.folder).glob("*.md")
-        if p.name != "INDEX.md"
-    ) if feature_source is not None else []
+    features = (
+        sorted(
+            p.stem
+            for p in folder_path(root, feature_source.folder).glob("*.md")
+            if p.name != "INDEX.md"
+        )
+        if feature_source is not None
+        else []
+    )
 
     # 일부러 규약 밖인 파일. **어느 파일이 면제인지는 그 저장소의 사실이라 설정이 답한다.**
     # 모듈 상수는 테스트가 덮어쓰는 자리로만 남았고, 설정 위에 얹힌다

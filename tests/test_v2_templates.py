@@ -21,7 +21,9 @@ def test_example_config_loads_both_quality_profiles(load_hook) -> None:
 
 
 def test_schema_and_example_agree_on_version() -> None:
-    schema = json.loads((CLAUDE_DIR / "harness" / "schemas" / "harness.schema.json").read_text(encoding="utf-8"))
+    schema = json.loads(
+        (CLAUDE_DIR / "harness" / "schemas" / "harness.schema.json").read_text(encoding="utf-8")
+    )
     example = json.loads((CLAUDE_DIR / "harness.json").read_text(encoding="utf-8"))
 
     assert schema["properties"]["schema_version"]["const"] == 2

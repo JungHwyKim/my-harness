@@ -28,9 +28,7 @@ HOOKS_DIR = REPO_ROOT / ".claude" / "harness" / "hooks"
 PROJECT_ROOT = REPO_ROOT
 
 # 스킬이 부르는 수집기들. 훅과 달리 **패키지**라 그 폴더가 아니라 부모를 얹는다
-SCRIPT_DIRS = (
-    REPO_ROOT / ".claude" / "harness" / "scripts",
-)
+SCRIPT_DIRS = (REPO_ROOT / ".claude" / "harness" / "scripts",)
 
 # 모듈 수준에서 얹는다. conftest 는 같은 폴더의 테스트 모듈보다 먼저 임포트되므로
 # 이 시점이면 테스트가 `import _hookutil` 하기 전이 보장된다
@@ -133,13 +131,14 @@ def load_hook(harness_project):
     return load
 
 
-
 # 훅 테스트가 개발자 환경의 탈출구를 물려받지 않게 한다.
 #
 # 훅은 전부 `main()` 첫머리에서 자기 탈출구를 보고 **즉시 반환**한다. 그 변수가 켜진 채로
 # 테스트를 돌리면 검사 대상이 아예 안 돌고, 결과가 두 갈래로 갈린다 — 마커나 출력을
 # 단정하는 테스트는 실패하고(실측 2026-08-22: SKIP_PLANINTERVIEW=1 에서 13개,
 # ALLOW_PAID_TESTS=1 에서 2개), "아무것도 안 낸다"를 단정하는 테스트는 **조용히 통과한다.**
+# (그 ALLOW_PAID_TESTS 실측은 기록으로 남긴다. 비용 훅은 2026-11-18 에 호출별 승인으로
+# 바뀌어 **더 이상 환경변수 우회가 없고**, 그 이름도 아래 목록에서 빠졌다.)
 # 뒤쪽이 더 나쁘다 — 이 저장소가 훅마다 두려워한 "검사가 있는 줄 알았는데 없는" 그 상태다.
 #
 # 탈출구를 켜는 것은 정상 사용이다(면담을 건너뛰는 세션 등). 그 사용자에게 저장소가 빨갛게

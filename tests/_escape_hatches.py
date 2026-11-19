@@ -11,9 +11,13 @@ CLAUDE.md 가 테스트 파일 이름에 대해 경고한 것과 정확히 같�
 from __future__ import annotations
 
 # `.claude/hooks/*.py` 의 `os.environ.get(...)` 과 짝이다. 짝이 어긋나면
-# test_hook_wiring.py 의 커버리지 테스트 둘이 양쪽에서 잡는다
+# test_hook_wiring.py 의 커버리지 테스트 둘이 양쪽에서 잡는다.
+#
+# **`ALLOW_PAID_TESTS` 가 없어진 자리다.** 비용 훅이 무조건 차단에서 호출별 승인으로
+# 바뀌면서 우회 자체가 사라졌다. 훅이 더 이상 그 변수를 읽지 않으므로 여기 남겨 두면
+# `test_no_stale_escape_hatch_names` 가 «어느 훅도 안 읽는 이름» 으로 잡는다 — 설정·스키마와
+# 함께 한 번에 지워야 하는 이유가 그것이다
 ESCAPE_HATCHES = (
-    "ALLOW_PAID_TESTS",
     "SKIP_AUTOTEST",
     "SKIP_HEREDOC",
     "SKIP_PLANINTERVIEW",

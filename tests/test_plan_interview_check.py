@@ -314,7 +314,9 @@ def test_answer_opens_the_gate(
 ):
     _run(
         monkeypatch,
-        _ask([("지금 설계서를 작성할까요?", ["지금 설계서 작성", "라운드 더"], "지금 설계서 작성")]),
+        _ask(
+            [("지금 설계서를 작성할까요?", ["지금 설계서 작성", "라운드 더"], "지금 설계서 작성")]
+        ),
     )
 
     assert _ready(hook_root)
@@ -388,7 +390,13 @@ def test_negated_answer_leaves_the_gate_closed(hook_root: Path, monkeypatch: pyt
     _run(
         monkeypatch,
         _ask(
-            [("지금 설계서를 작성할까요?", ["지금 설계서 작성", "라운드 더"], "아직 설계서 작성하지 마")]
+            [
+                (
+                    "지금 설계서를 작성할까요?",
+                    ["지금 설계서 작성", "라운드 더"],
+                    "아직 설계서 작성하지 마",
+                )
+            ]
         ),
     )
 
@@ -415,7 +423,9 @@ def test_exit_plan_mode_passes_after_an_answer(
 ):
     _run(
         monkeypatch,
-        _ask([("지금 설계서를 작성할까요?", ["지금 설계서 작성", "라운드 더"], "지금 설계서 작성")]),
+        _ask(
+            [("지금 설계서를 작성할까요?", ["지금 설계서 작성", "라운드 더"], "지금 설계서 작성")]
+        ),
     )
     capsys.readouterr()
 

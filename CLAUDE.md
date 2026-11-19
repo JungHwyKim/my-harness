@@ -17,6 +17,10 @@
 3. 결정 이유가 필요할 때만 `.claude/wiki/history/`를 검색한다.
 4. 전체 History를 기본 Context로 읽지 않는다.
 
+## 작업 인수인계
+
+- Codex와 Claude Code 사이의 작업 인수인계는 `.claude/skills/handoff/SKILL.md`를 읽고 따른다.
+
 ## Information Ownership
 
 - `CLAUDE.md`: 항상 필요한 최소 Context와 Router

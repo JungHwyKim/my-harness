@@ -168,3 +168,34 @@ def test_child_env_makes_korean_readable(monkeypatch: pytest.MonkeyPatch):
 
     assert "�" in without.stdout
     assert "임계값이 분포의 틈에서 안 나온다" in pinned.stdout
+
+
+# 산물 디렉터리는 «바뀐 파일»이 아니다.
+#
+# pytest 가 돌 때마다 `tests/__pycache__/*.pyc` 가 새로 쓰인다. 그것이 변경으로 잡히면 Fast
+# 게이트가 그 .pyc 를 pytest 대상으로 넘겨 수집 실패(exit 4)가 나고, 그 게이트가 다시
+# pytest 를 돌려 또 .pyc 를 만든다 — **스스로를 깨우는 고리다**(2026-11-18 실측: .pyc 15개가
+# 대상으로 넘어가 그 뒤 모든 도구 호출마다 Fast 게이트가 실패했다). git 을 쓰는
+# `changed_paths()` 는 `.gitignore` 덕에 이 함정이 없고, 파일시스템을 훑는 이쪽에만 있다
+def test_artifact_dirs_are_not_changed_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    (tmp_path / "tests" / "__pycache__").mkdir(parents=True)
+    (tmp_path / "tests" / "test_real.py").write_text("# 사람이 고친 것\n", encoding="utf-8")
+    (tmp_path / "tests" / "__pycache__" / "test_real.cpython-312.pyc").write_bytes(b"\x00")
+    monkeypatch.setattr(_hookutil, "PROJECT_ROOT", tmp_path)
+
+    found = _hookutil.tracked_paths_newer_than(("tests/",), 0.0)
+
+    assert found == ["tests/test_real.py"]
+
+
+# `.py` 만 보는 쪽도 같은 기준이어야 한다. 한쪽만 고치면 다른 쪽에서 되살아난다 —
+# 이 저장소가 `_hookutil` 을 만든 이유가 그것이다
+def test_artifact_dirs_are_excluded_from_py_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    (tmp_path / "src" / "__pycache__").mkdir(parents=True)
+    (tmp_path / "src" / "real.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "src" / "__pycache__" / "stale.py").write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr(_hookutil, "PROJECT_ROOT", tmp_path)
+
+    found = _hookutil.paths_newer_than(("src/",), 0.0)
+
+    assert found == ["src/real.py"]
