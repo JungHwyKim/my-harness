@@ -1416,7 +1416,13 @@ Not run, and why:
 - The README application example and the Fast/Full argv exclusions were not
   exercised. They are separate items in the spec and nothing in this round
   touches them, so the temp project checked the hook and the two shells only.
-- `.codex/hooks.json` was not changed. Same reason, and it is untracked.
+- `.codex/hooks.json` was not changed, and did not need to be. The user
+  checked it: the paid-test hook entry is already absent and the other hooks
+  are intact, so the spec item was already satisfied. `.codex/` stays out of
+  Git by decision — `ce4b701` records both `.agents/` and `.codex/` in
+  `.gitignore` with the reason, so the Codex hook config is per-machine
+  deliberately rather than by omission, and Knowledge says so. Nothing about
+  that file is open.
 
 Deltas from the spec: none. The decision asked for the raw segment to reach
 `_paid_reason()`, the three helpers removed if unused elsewhere, the contract
@@ -1453,3 +1459,77 @@ arises only when the raw text selects a paid marker.
 
 Controls for the other side: `pytest -q # 설명` and `pytest -q # --collect-only`
 stay free, so an ordinary comment still costs nothing.
+
+
+# Final review — approved, three wordings corrected
+
+Codex approved the code review for `hook-dicision`: `860fd7b` and `ce4b701` are
+on `release/v2`, the new comment cases return the right verdicts, the
+`.agents/`/`.codex/` exclusions are in place, and the full gate passes. No
+further implementation round. Three statements in the permanent documents were
+too strong, and each one is corrected after checking it against the hook rather
+than against the review line.
+
+**1. "A safe marker expression passes whatever the comment says."** Wrong, and
+the hook disagrees:
+
+```
+pytest -m 'not paid and not paid2' # 설명          -> allow
+pytest -m 'not paid and not paid2' # -m unit       -> ask
+pytest -m 'not paid and not paid2' # -c other.ini  -> ask
+pytest -m 'not paid and not paid2' # -o addopts=   -> ask
+```
+
+`_MARKER_RE` scans the whole segment and the loop asks on the first value it
+cannot prove, so a safe expression in front does not license what follows it.
+The boundary is "nothing anywhere in the raw text could override the default
+exclusion", not "a safe expression appears". Corrected in
+`knowledge/paid-test-approval.md` and in Plan History.
+
+**2. "Tokenization and executor identification both fail toward ask."** True of
+tokenization, false of executor identification:
+
+```
+./run_tests.sh -m paid    -> allow
+bash run_tests.sh -m paid -> allow
+make test -m paid         -> allow
+```
+
+`_runs_pytest()` ends in `return False`, so an unrecognized first token is not
+judged at all. Only pytest, a python interpreter, the known runners and a
+variable head reach the judgement. This is a pre-existing limit, already listed
+under 「감지하지 못하는 것」, and this round did not change it — but Plan History
+should not have claimed the safe direction for it. Corrected.
+
+**3. The `.codex/` tracking memo.** Decided by `ce4b701`: both `.agents/` and
+`.codex/` stay untracked, recorded in `.gitignore` with the reason. The memo no
+longer says it is open.
+
+## One spec item discharged while confirming the above
+
+`hook-dicision.md` asked for a check this round had not run: that the README
+application example and the Quality subprocess path exclude paid tests *without*
+the hook, since that pytest runs as a subprocess and never reaches
+`PreToolUse`. Run in the throwaway project:
+
+| Invocation | Result |
+|---|---|
+| `pytest -q` (relies on `addopts`) | 1 passed, **2 deselected** |
+| `pytest -m "not paid and not paid2" -q` (Fast/Full argv) | 1 passed, **2 deselected** |
+
+So that path is protected by the configured default exclusion, not by this
+hook — now stated in Knowledge, where it is a current fact rather than a
+round's finding.
+
+Gate after the corrections: `ruff check` clean, `ruff format --check` clean,
+**405 passed**.
+
+## Cleanup
+
+Everything worth keeping is in permanent documents: the current contract in
+`knowledge/paid-test-approval.md`, the decision with its rejected alternatives
+in `history/plan/2026-11-19-paid-hook-comment-stripping.md`, the `.codex/`
+decision in `history/plan/2026-11-19-codex-dir-tracking.md`. The eight bypasses
+and the round-by-round history live on in the commits. With this report
+committed, `hook-dicision.md` and this file are removed per step 9 of the
+handoff procedure.
