@@ -152,6 +152,17 @@ CI 게이트가 꺼지면 그건 검사가 아니다. 출력 머리에도 같은
 | Doctor | PASS 26 · WARN 1 · FAIL 0, 종료 0. 남은 WARN은 D-EXEC 「미검사」 | 2026-11-22, Claude 실행 |
 | Hosted CI / Ubuntu | `pip check`·Doctor·lint·format·Full 성공. **762 passed · 1 skipped / 7.93초**, format 75 files | 2026-11-22, Claude가 [run 45033823289](https://github.com/JungHwyKim/my-harness/actions/runs/45033823289)의 job 로그에서 확인해 `5f58805`에 보고. 실행 코드 `0e52390` |
 | Hosted CI / Windows | 같은 단계 성공. **762 passed · 1 skipped / 23.37초**, format 75 files | 같은 실행과 보고 커밋. Windows 최초 실패의 출력 인코딩 수정은 `0e52390` |
+| Hosted CI / Ubuntu (venv guard 적용 후) | 성공. **768 passed · 1 skipped / 10.41초**. 고른 인터프리터가 `/home/runner/work/my-harness/my-harness/.venv/bin/python`으로 보고됐다 | 2026-11-22, Claude가 [run 45043697211](https://github.com/JungHwyKim/my-harness/actions/runs/45043697211)의 job 로그에서 확인. 실행 코드 `7c540cb` |
+| Hosted CI / Windows (venv guard 적용 후) | 성공. **767 passed · 2 skipped / 26.76초**. `D:\a\my-harness\my-harness\.venv\Scripts\python.exe` | 같은 실행. skip 수가 OS마다 다른 것은 아래 설명대로다 |
+
+**`--require-venv` 도입 전 Linux job은 고른 경로를 기반 Python으로 보고했다** —
+`/opt/hostedtoolcache/Python/3.12.16/x64/bin/python3.12`. 같은 실행의 Windows는 `.venv`
+경로였다. 그 차이가 「풀어서 비교하면 OS마다 다른 것을 잰다」의 실측이고, 위 두 행에서 양쪽이
+모두 `.venv` 경로를 보고하는 것이 보강의 근거다.
+
+skip 수는 OS마다 다르다 — Windows는 POSIX 전용 둘(실행 권한 비트, venv symlink 판정)을,
+Linux는 Windows 전용 하나를 건너뛴다. 합계 769개는 같다. 두 OS의 수가 **같아야** 한다는
+규칙은 없으며, 같다는 사실을 플랫폼 결함이 없다는 증명으로 쓰지도 않는다.
 
 2026-11-23 Codex는 위 보고와 커밋을 대조해 최종 리뷰했다. GitHub API·페이지 재조회는 이
 검토 환경의 연결 오류로 하지 못했으므로, 위 hosted 수치는 **Claude가 보존한 실행 보고**에
