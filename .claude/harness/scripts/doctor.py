@@ -44,6 +44,18 @@ HOOKS_DIR = ".claude/harness/hooks"
 LIST_PLACEHOLDERS = ("{changed_files}", "{mapped_targets}")
 KNOWN_PLACEHOLDERS = ("{python}", *LIST_PLACEHOLDERS)
 
+# `_hookutil._ARTIFACT_DIRS` 와 같아야 한다. 옮겨 적은 이유는 다른 복제와 같다 — Doctor 는
+# 진단 런타임에서 훅을 import 하지 않는다. `tests/test_doctor.py` 가 두 집합을 대조한다
+ARTIFACT_DIRS = (
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".venv",
+    "node_modules",
+    ".git",
+)
+
 # 아래 다섯 묶음은 `.claude/harness/schemas/harness.schema.json` 을 그대로 옮긴 것이다.
 # **코드에 옮긴 이유는 `jsonschema` 를 새로 깔지 않기로 했기 때문이고**, 그러면 스키마와
 # 어긋날 수 있다. 그래서 `tests/test_doctor.py` 가 스키마 파일을 읽어 이 상수들과 대조한다
@@ -550,6 +562,22 @@ def check_quality_section(report: Report, path: str, config: dict) -> None:
                         f"{where}.unmapped_by_design[{key!r}]",
                         f"문자열이어야 합니다({_type_name(value)}).",
                         "제외한 이유를 문자열로 적는다.",
+                    )
+                elif not value.strip():
+                    # 스키마에 `minLength` 가 없어 빈 문자열이 통과한다. 그런데 이 집합이
+                    # 존재하는 이유가 「빠뜨린 게 아님」을 **적어 두는 것**이라, 사유 없는
+                    # 항목은 그 목적을 채우지 못한다. 소비자도 이것을 유효한 제외로 보지
+                    # 않으므로(훅은 알림, CLI 는 ERROR), Doctor 가 정상이라고 말하면 안 된다.
+                    #
+                    # FAIL 이 아니라 WARN 인 이유: Doctor 는 정적이라 그 경로가 실제로 변경될지
+                    # 모르고, 실제로 문제가 되는 순간에는 CLI 가 이미 ERROR 로 막는다
+                    report.add(
+                        WARN,
+                        "D-CONFIG",
+                        f"{where}.unmapped_by_design[{key!r}]",
+                        "사유가 비어 있습니다. 소비자는 이것을 유효한 제외로 보지 않아 "
+                        "그 경로의 변경이 매핑 누락으로 보고됩니다.",
+                        "왜 검사에서 뺐는지 적거나, 제외가 아니라면 이 항목을 지운다.",
                     )
 
     mappings = section.get("mappings")
@@ -1740,11 +1768,29 @@ def check_python(report: Report, root: Path, path: str, config: dict) -> None:
     configured = config.get("python")
     chosen, source, tried = chosen_python(root, config)
 
+    # **키가 아예 없는 것은 결함이 아니다.** `venv_python()` 의 순서는 설정 경로 →
+    # Windows venv → POSIX venv 이고, 키를 비워 두면 두 OS 가 각자의 `.venv` 를 쓴다 —
+    # 한 저장소를 Windows 와 Linux 에서 함께 검증하려면 그쪽이 맞는 설정이다.
+    #
+    # 가르지 않았을 때 무슨 일이 났는지가 이 분기의 이유다. 아래 「대체됐다」 문구는 *설정한
+    # 경로가 없을 때* 를 위한 것이라, 키가 없으면 `설정한 None 가 없어 ... 대체됩니다` 가
+    # 되고 고치는 법이 `환경을 None 에 만들어라` 가 됐다. 그 안내로는 아무것도 할 수 없다
+    has_configured = isinstance(configured, str) and bool(configured.strip())
+
     if chosen is not None and source == "python":
         report.ok("D-PYTHON", where, f"설정한 {configured} 를 씁니다 (Doctor 의 루트 기준 선택).")
         return
 
     if chosen is not None:
+        if not has_configured:
+            report.ok(
+                "D-PYTHON",
+                where,
+                f"python 키가 없어 {source} 를 자동으로 찾았습니다 (Doctor 의 루트 기준 선택). "
+                "두 OS 가 각자의 `.venv` 를 쓰는 정상 상태입니다. 실행 성공과 모듈 설치는 "
+                "미검증입니다.",
+            )
+            return
         report.add(
             WARN,
             "D-PYTHON",
@@ -1753,6 +1799,17 @@ def check_python(report: Report, root: Path, path: str, config: dict) -> None:
             "(Doctor 의 루트 기준 선택). 검사가 통과해도 지정한 환경에서 "
             "돌았다고 볼 수 없습니다.",
             f"환경을 {configured} 에 만들거나 python 값을 {source} 로 고친다.",
+        )
+        return
+
+    if not has_configured:
+        report.add(
+            WARN,
+            "D-PYTHON",
+            where,
+            f"`.venv` 를 찾지 못해 현재 프로세스 ({sys.executable}) 가 쓰입니다 "
+            f"(Doctor 의 루트 기준 선택). 시도 순서: {' → '.join(tried)}.",
+            "가상환경을 만든다. 다른 자리의 인터프리터를 쓸 거면 python 키로 지정한다.",
         )
         return
 
@@ -1936,6 +1993,27 @@ def _unmapped_keys(config: dict) -> tuple[str, ...]:
     return ()
 
 
+# 경로 -> 적어 둔 사유. 목록형은 사유 자리가 없으므로 빈 문자열이다.
+# `auto_test_check._load_unmapped_reasons()` 와 같은 모양이어야 한다
+def _unmapped_reasons(config: dict) -> dict[str, str]:
+    quality = config.get("quality")
+    raw = quality.get("unmapped_by_design") if isinstance(quality, dict) else None
+    if isinstance(raw, dict):
+        return {
+            key: value if isinstance(value, str) else ""
+            for key, value in raw.items()
+            if isinstance(key, str)
+        }
+    if isinstance(raw, list):
+        return {key: "" for key in raw if isinstance(key, str)}
+    return {}
+
+
+# **사유가 적힌** 제외 key만. 사유 없는 key는 유효한 제외가 아니므로 여기서 빠진다
+def _reasoned_unmapped(config: dict) -> tuple[str, ...]:
+    return tuple(key for key, why in _unmapped_reasons(config).items() if why.strip())
+
+
 def _mapping_rows(config: dict) -> tuple[tuple[str, str], ...]:
     quality = config.get("quality")
     raw = quality.get("mappings") if isinstance(quality, dict) else None
@@ -1954,7 +2032,11 @@ def _mapping_rows(config: dict) -> tuple[tuple[str, str], ...]:
 # `auto_test_check.test_target_for()` 를 **확정 가능한 입력에만** 옮긴 것이다. 디렉터리
 # 항목은 아래 파일을 전수 탐색하지 않으므로 커버리지를 증명하지 않는다
 def _target_for(
-    rel: str, rows: tuple[tuple[str, str], ...], unmapped: tuple[str, ...]
+    rel: str,
+    rows: tuple[tuple[str, str], ...],
+    unmapped: tuple[str, ...],
+    *,
+    v2: bool = True,
 ) -> str | None:
     if any(rel == item or rel.startswith(item) for item in unmapped):
         return rel  # 의도적 제외는 경고 대상이 아니다
@@ -1962,7 +2044,11 @@ def _target_for(
         name = rel.rsplit("/", 1)[-1]
         if not name.endswith(".py"):
             return None
-        return rel if name.startswith("test_") else None
+        if name.startswith("test_"):
+            return rel
+        # `auto_test_check.test_target_for()` 의 V2 분기와 같아야 한다 — 보조 테스트 파일은
+        # 영향 범위가 `tests/` 전체다. 한쪽만 고치면 Doctor 와 훅이 같은 경로를 다르게 말한다
+        return "tests/" if v2 else None
     best: tuple[str, str] | None = None
     for prefix, target in rows:
         if (rel == prefix or rel.startswith(prefix)) and (
@@ -1970,6 +2056,25 @@ def _target_for(
         ):
             best = (prefix, target)
     return best[1] if best else None
+
+
+# 매핑이 없어도 결함이 아닌 경로와 그 이유. 결함이면 None.
+#
+# **이 함수가 없으면 거짓 누락 경고가 난다.** `_target_for()` 는 서로 다른 사정에 같은
+# `None` 을 돌려주는데, 그 중 「매핑이 없다」만 결함이다. 생성물과 `tests/` 아래 비Python
+# 파일은 정상인데도 추적 경로 안에 있어서 같은 `None` 으로 떨어진다.
+# 우선순위는 `auto_test_check.classify()` 와 같아야 한다
+# `unmapped` 는 **사유가 적힌** key만 받는다. 사유를 비워 둔 제외는 이 명세가 허용한
+# 「사유 있는 의도적 제외」가 아니므로 정상으로 표시하면 안 된다 — 소비자(훅·CLI)도 그것을
+# 설정 결함으로 본다
+def _benign_without_mapping(rel: str, unmapped: tuple[str, ...]) -> str | None:
+    if any(part in ARTIFACT_DIRS for part in rel.split("/")):
+        return "도구가 만든 산물입니다."
+    if any(rel == item or rel.startswith(item) for item in unmapped):
+        return "unmapped_by_design 에 사유를 적은 의도적 제외입니다."
+    if rel.startswith("tests/") and not rel.rsplit("/", 1)[-1].endswith(".py"):
+        return "테스트 특례가 보지 않는 비Python 파일입니다."
+    return None
 
 
 def check_mapping(
@@ -1986,7 +2091,9 @@ def check_mapping(
         return
 
     rows = _mapping_rows(config)
-    unmapped = _unmapped_keys(config)
+    # **사유가 적힌 제외만 유효한 제외로 본다.** 사유를 비워 둔 key 를 여기 넘기면
+    # `_target_for()` 가 그것을 정상 제외로 돌려줘서, 검사가 꺼진 자리가 경고 없이 지나간다
+    unmapped = _reasoned_unmapped(config)
     where = f"{path}: quality.tracked_paths"
     orphans: list[str] = []
     for raw in _field_entries(config, "quality.tracked_paths") or string_list(
@@ -1996,6 +2103,8 @@ def check_mapping(
         if not normalized or normalized.endswith("/"):
             continue
         if not (root / normalized).is_file():
+            continue
+        if _benign_without_mapping(normalized, unmapped) is not None:
             continue
         if _target_for(normalized, rows, unmapped) is None:
             orphans.append(normalized)

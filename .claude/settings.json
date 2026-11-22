@@ -134,7 +134,7 @@
           {
             "type": "command",
             "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/harness/hooks/auto_test_check.py\"",
-            "timeout": 600,
+            "timeout": 900,
             "statusMessage": "Full Quality Gate 확인 중..."
           },
           {

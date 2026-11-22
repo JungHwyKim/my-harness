@@ -361,3 +361,333 @@ def test_v2_ignores_direct_change_outside_quality_scope(load_hook) -> None:
     payload = {"tool_input": {"file_path": "docs/notes.md"}}
 
     assert module._changed_files_for_call(payload, "v2-outside") == []
+
+
+# ---- 경로 분류: `None` 하나로는 못 가르는 네 가지 ----
+
+# 이 저장소의 실제 설정과 **같은 모양**이다. `.claude/settings.json` 을 일부러 매핑 없이
+# 추적만 해 둔 것이 요점이다 — 그 자리가 「매핑 누락」이고, 나머지는 전부 정상이다
+V2_CLASSIFY_CONFIG = {
+    "schema_version": 2,
+    "wiki_root": ".claude/wiki/",
+    "source_prefixes": [".claude/harness/", "tests/"],
+    "history": {
+        "plan": "history/plan/",
+        "task": "history/task/",
+        "verify": "history/verify/",
+        "tracked_paths": [".claude/harness/"],
+    },
+    "quality": {
+        "tracked_paths": [
+            ".claude/harness/",
+            "tests/",
+            ".claude/settings.json",
+            ".github/workflows/",
+        ],
+        "mappings": [{"path": ".claude/harness/", "tests": "tests/"}],
+        "unmapped_by_design": {
+            ".github/workflows/": "Python 테스트로 hosted CI 실행을 증명할 수 없다",
+        },
+        "profiles": {
+            "fast": {
+                "triggers": ["post_change"],
+                "stages": [
+                    {
+                        "id": "test",
+                        "argv": ["{python}", "-m", "pytest", "{mapped_targets}", "-q"],
+                        "timeout": 90,
+                        "success_codes": [0],
+                    }
+                ],
+            },
+            "full": {
+                "triggers": ["stop"],
+                "stages": [{"id": "test", "argv": ["{python}", "-m", "pytest", "-q"]}],
+            },
+        },
+    },
+}
+
+
+# 원인마다 다른 판정이 나와야 한다. **표가 아니라 이 단정이 계약이다** —
+# 여섯 줄 중 하나라도 `unmapped` 로 떨어지면 평범한 파일에 설정 결함 판정이 붙는다
+@pytest.mark.parametrize(
+    ("path", "cause", "target"),
+    [
+        (".claude/harness/hooks/_quality.py", "target", "tests/"),
+        (".claude/harness/scripts/doctor.py", "target", "tests/"),
+        ("tests/test_doctor.py", "target", "tests/test_doctor.py"),
+        ("tests/conftest.py", "target", "tests/"),
+        ("tests/_escape_hatches.py", "target", "tests/"),
+        ("tests/fixtures/a.json", "non_python_test", None),
+        ("tests/__pycache__/x.pyc", "artifact", None),
+        (".github/workflows/harness-quality.yml", "excluded", None),
+        ("docs/notes.md", "untracked", None),
+        (".claude/settings.json", "unmapped", None),
+    ],
+)
+def test_classify_separates_the_causes(load_hook, path, cause, target) -> None:
+    module, _ = load_hook("auto_test_check", V2_CLASSIFY_CONFIG)
+
+    row = module.classify(path)
+
+    assert row.cause == cause, f"{path}: {row.cause} — {row.reason}"
+    assert row.target == target
+    assert row.reason or row.cause == "target"
+
+
+# 생성물이 비추적·테스트 특례보다 먼저 걸러져야 한다. `tests/__pycache__/x.pyc` 는 추적
+# 경로 **안**이라, 순서가 뒤집히면 비Python 파일이나 매핑 누락으로 떨어진다
+def test_artifact_wins_over_the_test_special_case(load_hook) -> None:
+    module, _ = load_hook("auto_test_check", V2_CLASSIFY_CONFIG)
+
+    assert module.classify("tests/__pycache__/conftest.pyc").cause == "artifact"
+    assert module.classify(".ruff_cache/x.json").cause == "artifact"
+
+
+# 루트 밖은 사용 오류 쪽이다. 매핑이 없다는 말로 보고하면 고칠 곳을 잘못 가리킨다
+def test_classify_reports_paths_outside_the_root(load_hook, tmp_path) -> None:
+    module, _ = load_hook("auto_test_check", V2_CLASSIFY_CONFIG)
+
+    assert module.classify(str(tmp_path / "바깥.py")).cause == "outside"
+
+
+# `{mapped_targets}` 를 쓰지 않는 Profile 에서는 매핑이 없는 것이 결함이 아니다
+def test_mapping_is_not_required_when_the_profile_does_not_use_targets(load_hook) -> None:
+    module, _ = load_hook("auto_test_check", V2_CLASSIFY_CONFIG)
+
+    row = module.classify(".claude/settings.json", mapping_required=False)
+
+    assert row.cause == "no_mapping_needed"
+
+
+# ---- 매핑 누락 알림: 막지 않고, 세션당 한 번 ----
+
+
+# `run_profile` 을 갈아끼워 실제 pytest 를 돌리지 않는다. 여기서 재는 것은 **무엇을
+# 대상으로 넘겼나**와 **알렸나**이고, pytest 가 통과하는지는 이 테스트의 관심이 아니다
+@pytest.fixture
+def fake_profile(monkeypatch: pytest.MonkeyPatch):
+    import _quality
+
+    calls: list[dict] = []
+
+    def fake(name, *, changed_files=(), mapped_targets=()):
+        calls.append(
+            {"name": name, "changed": tuple(changed_files), "targets": tuple(mapped_targets)}
+        )
+        return ()
+
+    monkeypatch.setattr(_quality, "run_profile", fake)
+    return calls
+
+
+def test_unmapped_tracked_file_is_announced_without_blocking(
+    load_hook, fake_profile, capsys
+) -> None:
+    module, _ = load_hook("auto_test_check", V2_CLASSIFY_CONFIG)
+    payload = {"tool_input": {"file_path": ".claude/settings.json"}}
+
+    # 막지 않는다 — 예외도 SystemExit 도 없이 돌아온다
+    module._handle_v2_post_tool_use(payload, "notice-1")
+
+    out = capsys.readouterr().out
+    assert "systemMessage" in out
+    assert ".claude/settings.json" in out
+    assert "quality.mappings" in out and "unmapped_by_design" in out
+
+
+def test_the_notice_is_once_per_session(load_hook, fake_profile, capsys) -> None:
+    module, _ = load_hook("auto_test_check", V2_CLASSIFY_CONFIG)
+    payload = {"tool_input": {"file_path": ".claude/settings.json"}}
+
+    module._handle_v2_post_tool_use(payload, "notice-2")
+    capsys.readouterr()
+    module._handle_v2_post_tool_use(payload, "notice-2")
+
+    assert capsys.readouterr().out == ""
+
+
+def test_a_new_session_is_told_again(load_hook, fake_profile, capsys) -> None:
+    module, _ = load_hook("auto_test_check", V2_CLASSIFY_CONFIG)
+    payload = {"tool_input": {"file_path": ".claude/settings.json"}}
+
+    module._handle_v2_post_tool_use(payload, "notice-3")
+    capsys.readouterr()
+    module._handle_v2_post_tool_use(payload, "notice-4")
+
+    assert "systemMessage" in capsys.readouterr().out
+
+
+# 이유를 적어 둔 제외는 알리지 않는다. 알리면 설정이 맞는데도 매 세션 같은 줄이 붙는다
+def test_intentional_exclusion_is_silent(load_hook, fake_profile, capsys) -> None:
+    module, _ = load_hook("auto_test_check", V2_CLASSIFY_CONFIG)
+    payload = {"tool_input": {"file_path": ".github/workflows/harness-quality.yml"}}
+
+    module._handle_v2_post_tool_use(payload, "notice-5")
+
+    assert capsys.readouterr().out == ""
+    assert fake_profile == [], "제외만 있으면 stage 를 돌릴 것이 없다"
+
+
+# 유효한 대상이 함께 있으면 알린 **뒤에도** 그 검사는 돈다. 알림이 검사를 삼키면
+# 매핑 하나가 빠진 것 때문에 나머지 검사가 통째로 멈춘다
+def test_a_valid_target_still_runs_after_the_notice(load_hook, fake_profile, capsys) -> None:
+    module, _ = load_hook("auto_test_check", V2_CLASSIFY_CONFIG)
+
+    module._handle_v2_post_tool_use(
+        {"tool_input": {"file_path": ".claude/settings.json"}}, "notice-6"
+    )
+    module._handle_v2_post_tool_use(
+        {"tool_input": {"file_path": ".claude/harness/hooks/_quality.py"}}, "notice-6"
+    )
+
+    assert "systemMessage" in capsys.readouterr().out
+    assert fake_profile == [
+        {
+            "name": "fast",
+            "changed": (".claude/harness/hooks/_quality.py",),
+            "targets": ("tests/",),
+        }
+    ]
+
+
+# ---- 분류가 실행 입력을 정한다: `{changed_files}` 만 쓰는 Fast ----
+
+# 매핑을 **요구하지 않는** Profile. 「매핑이 필요한가」만으로 실행 여부를 정하던 동안,
+# 이 설정에서는 정책상 제외한 파일까지 그대로 stage 인자로 넘어가 실행됐다
+V2_CHANGED_ONLY_CONFIG = {
+    **V2_CLASSIFY_CONFIG,
+    "quality": {
+        **V2_CLASSIFY_CONFIG["quality"],
+        "profiles": {
+            "fast": {
+                "triggers": ["post_change"],
+                "stages": [{"id": "test", "argv": ["{python}", "-m", "probe", "{changed_files}"]}],
+            },
+            "full": {
+                "triggers": ["stop"],
+                "stages": [{"id": "test", "argv": ["{python}", "-m", "probe"]}],
+            },
+        },
+    },
+}
+
+
+def payload_for(rel: str) -> dict:
+    return {"tool_input": {"file_path": rel}}
+
+
+@pytest.mark.parametrize(
+    ("path", "label"),
+    [
+        (".github/workflows/x.yml", "사유 있는 제외"),
+        ("tests/__pycache__/x.pyc", "생성물"),
+        ("tests/fixtures/a.json", "비Python 테스트 파일"),
+    ],
+)
+def test_hook_runs_nothing_for_excluded_input(load_hook, fake_profile, path, label) -> None:
+    module, _ = load_hook("auto_test_check", V2_CHANGED_ONLY_CONFIG)
+
+    module._handle_v2_post_tool_use(payload_for(path), f"changed-only-{label}")
+
+    assert fake_profile == [], f"{label}인데 stage 를 불렀다"
+
+
+def test_hook_runs_with_the_valid_file(load_hook, fake_profile) -> None:
+    module, _ = load_hook("auto_test_check", V2_CHANGED_ONLY_CONFIG)
+
+    module._handle_v2_post_tool_use(payload_for(".claude/harness/hooks/_quality.py"), "co-valid")
+
+    assert fake_profile == [
+        {
+            "name": "fast",
+            "changed": (".claude/harness/hooks/_quality.py",),
+            "targets": ("tests/",),
+        }
+    ]
+
+
+# 매핑이 필요 없는 정상 추적 파일은 실행된다 — 매핑 부재만으로 건너뛰지 않는다
+def test_hook_runs_a_tracked_file_that_needs_no_mapping(load_hook, fake_profile) -> None:
+    module, _ = load_hook("auto_test_check", V2_CHANGED_ONLY_CONFIG)
+
+    module._handle_v2_post_tool_use(payload_for(".claude/settings.json"), "co-nomap")
+
+    assert fake_profile == [{"name": "fast", "changed": (".claude/settings.json",), "targets": ()}]
+
+
+# ---- 사유 없는 제외 ----
+
+
+def test_an_exclusion_without_a_reason_is_a_problem(load_hook, fake_profile, capsys) -> None:
+    config = {
+        **V2_CLASSIFY_CONFIG,
+        "quality": {**V2_CLASSIFY_CONFIG["quality"], "unmapped_by_design": {"tests/": ""}},
+    }
+    module, _ = load_hook("auto_test_check", config)
+
+    row = module.classify("tests/fixtures/a.py")
+    assert row.cause == module.CAUSE_EXCLUDED_NO_REASON
+    assert "사유가 없습니다" in row.reason
+
+    module._handle_v2_post_tool_use(payload_for("tests/fixtures/a.py"), "noreason")
+
+    assert "systemMessage" in capsys.readouterr().out
+    assert fake_profile == [], "사유 없는 제외는 유효한 제외가 아니므로 돌릴 것도 없다"
+
+
+@pytest.mark.parametrize("why", ["", "   ", None, 42])
+def test_every_empty_reason_shape_is_a_problem(load_hook, why) -> None:
+    config = {
+        **V2_CLASSIFY_CONFIG,
+        "quality": {**V2_CLASSIFY_CONFIG["quality"], "unmapped_by_design": {"tests/": why}},
+    }
+    module, _ = load_hook("auto_test_check", config)
+
+    assert module.classify("tests/fixtures/a.py").cause == module.CAUSE_EXCLUDED_NO_REASON
+
+
+def test_a_real_reason_is_still_a_silent_exclusion(load_hook) -> None:
+    module, _ = load_hook("auto_test_check", V2_CLASSIFY_CONFIG)
+
+    row = module.classify(".github/workflows/x.yml")
+
+    assert row.cause == module.CAUSE_EXCLUDED
+    assert row.reason == "Python 테스트로 hosted CI 실행을 증명할 수 없다"
+
+
+# **V1 목록형은 사유 자리가 아예 없었다.** 그 설정에서 사유 없음은 결함이 아니다 —
+# 기존 동작을 깨지 않는다
+def test_v1_list_exclusions_stay_valid(load_hook) -> None:
+    v1_config = {
+        "source_prefixes": ["src/"],
+        "checks": {
+            "auto_test": {
+                "mappings": [{"path": "src/", "tests": "tests/"}],
+                "unmapped_by_design": ["src/config.py"],
+            }
+        },
+    }
+    module, _ = load_hook("auto_test_check", v1_config)
+
+    row = module.classify("src/config.py")
+
+    assert row.cause == module.CAUSE_EXCLUDED
+    assert module.test_target_for("src/config.py") is None
+
+
+# 겹치는 제외 항목에서는 **최장 접두사**의 사유가 나온다. 설정 순서에 좌우되면
+# 같은 파일이 실행마다 다른 사유로 보고될 수 있다
+def test_the_longest_exclusion_prefix_supplies_the_reason(load_hook) -> None:
+    config = {
+        **V2_CLASSIFY_CONFIG,
+        "quality": {
+            **V2_CLASSIFY_CONFIG["quality"],
+            "unmapped_by_design": {"tests/": "넓은 사유", "tests/fixtures/": "좁은 사유"},
+        },
+    }
+    module, _ = load_hook("auto_test_check", config)
+
+    assert module.classify("tests/fixtures/a.py").reason == "좁은 사유"
+    assert module.classify("tests/다른.py").reason == "넓은 사유"

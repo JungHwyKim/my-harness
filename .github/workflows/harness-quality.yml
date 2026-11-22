@@ -1,0 +1,99 @@
+# 하네스 자신의 Quality Profile을 두 OS에서 돌린다.
+#
+# **Profile 명령을 여기 다시 적지 않는 것이 이 파일의 요점이다.** lint·format·test의 argv와
+# timeout은 `.claude/harness.json`에 있고, 훅과 `run_quality.py`가 그것을 돌린다. YAML에
+# `pytest -q`를 한 번 더 적으면 기준이 네 자리가 되고, 그러면 조용히 어긋난다.
+#
+# **Doctor를 Profile보다 먼저 돌린다.** 설정이 깨졌을 때 「검사가 실패했다」가 아니라
+# 「설정이 이렇게 깨져 있다」를 먼저 보여 주는 쪽이 고치기 쉽다.
+#
+# **셸은 두 OS 다 bash다.** Windows 러너의 bash는 GitHub가 공식 지원하며 `-eo pipefail`로
+# 돌아서, 한 step의 중간 명령이 실패하면 그대로 전파된다. PowerShell에서 외부 명령 여러 개를
+# 한 step에 넣었을 때 마지막 종료 코드에 앞의 실패가 가려지는 함정을 이 선택이 없애 준다.
+#
+# 가상환경은 캐시하지 않는다. 고정 의존성 두 줄을 받는 비용이 캐시가 낡아 「무엇이 깔렸는지
+# 모르는 상태」로 검사가 도는 위험보다 싸다.
+name: harness-quality
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    strategy:
+      # 한 OS가 실패해도 다른 OS의 결과를 끝까지 받는다. 이식성 문제는 양쪽을 비교해야
+      # 원인이 보이는데, 기본값은 남은 leg를 취소해 비교할 짝을 없애 버린다
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # venv 실행 파일 자리는 OS마다 다르다. `_hookutil.venv_python()`이 보는 순서와 같은
+      # 두 자리를 여기서도 명시한다 — 한쪽을 빼면 그 OS에서 조용히 다른 인터프리터가 쓰인다
+      - name: 가상환경 만들기
+        run: |
+          python -m venv .venv
+          if [ -x .venv/Scripts/python.exe ]; then
+            echo "VENV_PYTHON=.venv/Scripts/python.exe" >> "$GITHUB_ENV"
+          elif [ -x .venv/bin/python ]; then
+            echo "VENV_PYTHON=.venv/bin/python" >> "$GITHUB_ENV"
+          else
+            echo "두 자리 모두 없습니다: .venv/Scripts/python.exe, .venv/bin/python" >&2
+            exit 1
+          fi
+
+      - name: 고정 의존성 설치
+        run: $VENV_PYTHON -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: 설치 일관성 확인
+        run: $VENV_PYTHON -m pip check
+
+      # 하네스가 **준비한 그 venv**를 고르는지 본다. 설정에 다른 경로가 남아 있으면 검사는
+      # 통과하면서 다른 환경에서 돈다 — 그 상태를 통과로 보고하지 않기 위한 단계다
+      - name: 인터프리터 일치 확인
+        run: |
+          $VENV_PYTHON - <<'PY'
+          import os
+          import sys
+
+          sys.path.insert(0, os.path.join(".claude", "harness", "hooks"))
+          import _hookutil
+
+          # **루트를 먼저 본다.** 루트가 틀리면 아래 비교가 「둘 다 못 찾아서 같다」로 우연히
+          # 통과한다 — venv 를 못 찾았을 때의 대체값이 지금 돌고 있는 프로세스 자신이기 때문이다.
+          #
+          # `CLAUDE_PROJECT_DIR` 를 여기서 **설정하지 않는** 이유도 그것이다. Windows 러너의
+          # bash 에서 `$PWD` 는 `/d/a/...` 모양인데, Windows 의 `Path()` 는 그것을 현재 드라이브
+          # 기준 `C:\d\a\...` 로 읽는다(실측). 그러면 루트 탐색이 빗나가고 위 우연한 통과가 난다.
+          # 환경변수를 비워 두면 `_find_root()` 가 `os.getcwd()` 를 쓰고, 그쪽은 제대로 된 경로다
+          root = os.path.realpath(_hookutil.PROJECT_ROOT)
+          cwd = os.path.realpath(os.getcwd())
+          if root != cwd:
+              raise SystemExit(f"하네스가 잡은 루트가 다릅니다: {root} != {cwd}")
+
+          chosen = os.path.realpath(_hookutil.venv_python())
+          expected = os.path.realpath(sys.executable)
+          if chosen != expected:
+              raise SystemExit(f"하네스가 고른 인터프리터가 다릅니다: {chosen} != {expected}")
+          print(f"일치: {chosen}")
+          PY
+
+      - name: Doctor 정적 진단
+        run: $VENV_PYTHON .claude/harness/scripts/doctor.py
+
+      - name: Full Quality Profile
+        run: $VENV_PYTHON .claude/harness/scripts/run_quality.py --profile full

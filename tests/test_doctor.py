@@ -1001,6 +1001,58 @@ def test_python_choice_states_doctor_root(project):
     assert "Doctor 의 루트 기준" in messages(report, "D-PYTHON")
 
 
+# **키를 비워 두는 것은 정상 설정이다.** 두 OS 가 각자의 `.venv` 를 쓰게 하는 방법이고,
+# `venv_python()` 의 탐색 순서가 이미 그것을 한다.
+#
+# 가르지 않았을 때 무슨 일이 났는지가 이 테스트의 이유다 — 「설정한 경로가 없어 대체됐다」
+# 문구가 그대로 쓰여서 `설정한 None 가 없어 ... 대체됩니다` 가 나오고, 고치는 법이
+# `환경을 None 에 만들어라` 가 됐다. 그 안내로는 아무것도 할 수 없다
+def test_absent_python_key_with_a_venv_is_a_pass(project):
+    config = healthy_config()
+    config.pop("python")
+    root = project(config=config)
+    venv = root / ".venv" / "Scripts"
+    venv.mkdir(parents=True, exist_ok=True)
+    (venv / "python.exe").write_text("", encoding="utf-8")
+
+    report = doctor.diagnose(root)
+    text = messages(report, "D-PYTHON")
+
+    assert doctor.PASS in levels(report, "D-PYTHON")
+    assert doctor.WARN not in levels(report, "D-PYTHON")
+    assert "None" not in text
+    assert ".venv/Scripts/python.exe" in text
+
+
+def test_absent_python_key_without_a_venv_warns_without_naming_none(project):
+    config = healthy_config()
+    config.pop("python")
+
+    report = doctor.diagnose(project(config=config))
+    text = messages(report, "D-PYTHON")
+
+    assert doctor.WARN in levels(report, "D-PYTHON")
+    assert "None" not in text
+    # 안내는 「가상환경을 만들어라」 쪽이어야 한다. 없는 키를 고치라고 할 수는 없다
+    assert "가상환경을 만든다" in text
+
+
+# 반대쪽은 그대로다 — **적어 둔 경로가 없을 때는 여전히 WARN 이다.** 그 경우에는 사람이
+# 의도한 환경이 거기 없다는 뜻이라, 검사가 통과해도 그 환경에서 돌았다고 볼 수 없다
+def test_configured_python_that_is_missing_still_warns(project):
+    config = healthy_config()
+    config["python"] = ".venv/없는/python.exe"
+    root = project(config=config)
+    venv = root / ".venv" / "Scripts"
+    venv.mkdir(parents=True, exist_ok=True)
+    (venv / "python.exe").write_text("", encoding="utf-8")
+
+    report = doctor.diagnose(root)
+
+    assert doctor.WARN in levels(report, "D-PYTHON")
+    assert "없는" in messages(report, "D-PYTHON")
+
+
 def test_other_language_project_is_not_failed(project):
     config = healthy_config()
     config.pop("python")
@@ -1487,3 +1539,135 @@ def test_entry_normalization_matches_hookutil(load_hook, entry):
     else:
         # 끝에 `/` 가 없으면 **정확한 파일 하나**로 읽는다. 그래서 디렉터리는 0건이다
         assert found == []
+
+
+# 생성물 폴더 목록도 옮겨 적은 것이다. 어긋나면 Doctor 와 훅이 같은 `.pyc` 를 다르게 본다
+def test_artifact_dirs_match_hookutil(load_hook):
+    hookutil, _ = load_hook("_hookutil", healthy_config())
+
+    assert set(doctor.ARTIFACT_DIRS) == set(hookutil._ARTIFACT_DIRS)
+
+
+# **대상 계산의 복제 대조.** 이 테스트가 없는 동안 두 함수는 이미 갈라질 수 있었다 —
+# `check_mapping()` 이 파일 항목만 보기 때문에 `tests/conftest.py` 의 불일치가 Doctor
+# 출력에 **드러나지도 않는다.** CI 가 Doctor 와 CLI 를 나란히 돌리므로, 같은 경로를 두
+# 도구가 다르게 말하는 상태를 테스트로 막는다.
+#
+# 단정이 「같은 값」이 아니라 「같은 판정」인 것은 두 함수의 반환 규약이 다르기 때문이다 —
+# Doctor 는 의도적 제외에 `rel` 을 돌려주고(누락이 아니라는 뜻) 훅은 `None` 을 돌려준다.
+# 그래서 **매핑 결함인가**와 **대상이 무엇인가**를 각각 맞춰 본다
+DUPLICATED_TARGET_INPUTS = (
+    "tests/test_doctor.py",
+    "tests/conftest.py",
+    "tests/_escape_hatches.py",
+    "tests/fixtures/a.json",
+    "tests/__pycache__/x.pyc",
+    ".claude/harness/hooks/_quality.py",
+    ".claude/harness/scripts/doctor.py",
+    ".claude/settings.json",
+    ".github/workflows/harness-quality.yml",
+)
+
+TARGET_COMPARISON_CONFIG = {
+    "schema_version": 2,
+    "wiki_root": ".claude/wiki/",
+    "history": {
+        "plan": "history/plan/",
+        "task": "history/task/",
+        "verify": "history/verify/",
+        "tracked_paths": [".claude/harness/"],
+    },
+    "quality": {
+        "tracked_paths": [
+            ".claude/harness/",
+            "tests/",
+            ".claude/settings.json",
+            ".github/workflows/",
+        ],
+        "mappings": [{"path": ".claude/harness/", "tests": "tests/"}],
+        "unmapped_by_design": {".github/workflows/": "hosted CI는 Python 테스트로 증명할 수 없다"},
+        "profiles": {
+            "fast": {
+                "triggers": ["post_change"],
+                "stages": [
+                    {"id": "test", "argv": ["{python}", "-m", "pytest", "{mapped_targets}", "-q"]}
+                ],
+            },
+            "full": {
+                "triggers": ["stop"],
+                "stages": [{"id": "test", "argv": ["{python}", "-m", "pytest", "-q"]}],
+            },
+        },
+    },
+}
+
+
+@pytest.mark.parametrize("rel", DUPLICATED_TARGET_INPUTS)
+def test_target_calculation_matches_the_hook(load_hook, rel):
+    hook, _ = load_hook("auto_test_check", TARGET_COMPARISON_CONFIG)
+    rows = doctor._mapping_rows(TARGET_COMPARISON_CONFIG)
+    # 사유 있는 제외만 유효하다 — 소비자와 같은 기준이어야 아래 대조가 성립한다
+    unmapped = doctor._reasoned_unmapped(TARGET_COMPARISON_CONFIG)
+
+    row = hook.classify(rel)
+    benign = doctor._benign_without_mapping(rel, unmapped)
+    target = doctor._target_for(rel, rows, unmapped)
+
+    # 1) 매핑 결함인가 — Doctor 는 benign 도 아니고 대상도 없을 때만 누락으로 본다
+    doctor_gap = benign is None and target is None
+    assert doctor_gap is (row.cause == hook.CAUSE_UNMAPPED), (
+        f"{rel}: Doctor gap={doctor_gap}, 훅 cause={row.cause}"
+    )
+
+    # 2) 돌릴 대상이 무엇인가 — 대상이 있으면 두 쪽이 같은 것을 가리켜야 한다
+    if row.cause == hook.CAUSE_TARGET:
+        assert target == row.target, f"{rel}: Doctor={target}, 훅={row.target}"
+
+
+# ---- 사유 없는 제외: Doctor 도 정상이라고 말하지 않는다 ----
+
+
+# 스키마에 `minLength` 가 없어 빈 사유가 통과한다. 그런데 소비자(훅·CLI)는 그것을 유효한
+# 제외로 보지 않으므로, Doctor 가 조용히 넘기면 세 도구의 판정이 갈린다
+@pytest.mark.parametrize("why", ["", "   "])
+def test_unmapped_without_a_reason_warns(project, why):
+    config = healthy_config()
+    config["quality"]["unmapped_by_design"] = {"src/": why}
+
+    report = doctor.diagnose(project(config=config))
+
+    assert doctor.WARN in levels(report, "D-CONFIG")
+    assert "사유가 비어 있습니다" in messages(report, "D-CONFIG")
+
+
+def test_unmapped_with_a_reason_is_not_warned(project):
+    config = healthy_config()
+    config["quality"]["unmapped_by_design"] = {
+        "src/": "전 영역에 영향을 주어 부분 실행이 무의미하다"
+    }
+
+    report = doctor.diagnose(project(config=config))
+
+    assert "사유가 비어 있습니다" not in messages(report, "D-CONFIG")
+
+
+# 사유 없는 제외는 **유효한 제외가 아니므로** 매핑 판정에서도 빠진다
+def test_reasoned_unmapped_drops_the_empty_ones():
+    config = {
+        "quality": {
+            "unmapped_by_design": {
+                "a/": "진짜 사유",
+                "b/": "",
+                "c/": "   ",
+                "d/": None,
+            }
+        }
+    }
+
+    assert doctor._reasoned_unmapped(config) == ("a/",)
+    assert set(doctor._unmapped_keys(config)) == {"a/", "b/", "c/", "d/"}
+
+
+def test_benign_without_mapping_needs_a_reasoned_exclusion():
+    assert doctor._benign_without_mapping("docs/a.md", ("docs/",)) is not None
+    assert doctor._benign_without_mapping("docs/a.md", ()) is None

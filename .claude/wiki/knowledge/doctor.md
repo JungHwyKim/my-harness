@@ -233,26 +233,56 @@ FAIL). 셸 해석기로 확장하거나 설정에 적힌 명령을 실행해 확
 basename만으로 통과시키지 않고, 정규화한 전체 프로젝트 경로와 `type: command`를 함께 본다.
 `${CLAUDE_PROJECT_DIR}`는 대상 루트로 정적으로 치환하며, 다른 변수는 추측해 풀지 않는다.
 
-## 자동 추적 범위 밖이다
+## 자동 추적 범위 안이다
 
-`.claude/harness/scripts/`는 현재 `quality.tracked_paths` 밖이다. 그래서 `doctor.py`를
-고쳐도 **Fast 게이트가 돌지 않는다** — 이번 작업은 이 범위를 의도적으로 그대로 두었다.
-영향 테스트는 지정 인터프리터로 직접 돌린다.
+`.claude/harness/`가 `quality.tracked_paths`에 들어가고 `tests/`로 매핑되므로, `doctor.py`를
+고치면 **Fast 게이트가 전체 테스트를 돌린다.** 예전에는 `scripts/`가 추적 밖이어서 Doctor를
+고쳐도 아무 검사가 돌지 않았다.
 
-```text
-.venv/Scripts/python.exe -m pytest tests/test_doctor.py -q
-```
+`tests/`는 추적 경로 안이고 `test_target_for()`의 특례에 걸린다. `tests/test_doctor.py`를
+고치면 그 파일만, `tests/conftest.py`처럼 보조 파일을 고치면 `tests/` 전체가 돈다.
 
-`tests/`는 추적 경로 안이고 `test_target_for()`의 직접 테스트 특례에 걸리므로,
-`tests/test_doctor.py`를 고치면 그 파일만 Fast로 돈다.
+## 훅과 공유하는 판정
+
+Doctor는 진단 런타임에서 훅을 import하지 않는다. 그래서 아래 넷은 **옮겨 적은 것**이고,
+`tests/test_doctor.py`가 실제 훅 모듈과 대조한다. 한쪽만 고치면 그 대조가 깨진다.
+
+| 복제 | 원본 |
+|---|---|
+| `wiki_root_of()`, `history_prefix_of()` | `_hookutil._wiki_root()`, `history_prefix()` |
+| `chosen_python()` | `_hookutil.venv_python()` |
+| `normalize_entry()` | `_hookutil.tracked_paths_newer_than()`의 정규화 |
+| `ARTIFACT_DIRS` | `_hookutil._ARTIFACT_DIRS` |
+| `_target_for()` | `auto_test_check.test_target_for()` |
+
+`_target_for()`의 대조가 특히 조용히 깨진다 — `check_mapping()`은 추적 항목 중 **파일**만
+보므로, `tests/conftest.py` 같은 디렉터리 하위 경로의 불일치가 Doctor 출력에 드러나지
+않는다. CI가 Doctor와 `run_quality.py`를 나란히 돌리는 지금은 두 도구가 같은 경로를 다르게
+말하는 상태가 더 비싸다.
+
+## 매핑 누락과 정상 제외를 가른다
+
+`_target_for()`가 `None`을 돌려주는 사정은 여럿이고 **그중 하나만 결함**이다. 생성물,
+`unmapped_by_design`에 사유를 적은 제외, `tests/` 아래 비Python 파일은 정상인데도 추적 경로
+안에 있어서 같은 `None`으로 떨어진다. `_benign_without_mapping()`이 그 셋을 먼저 걸러내므로
+D-MAPPING은 실제 매핑 누락만 경고한다.
+
+## 인터프리터 키가 없는 것은 정상이다
+
+`python` 키를 비워 두면 두 OS가 각자의 `.venv`를 쓴다. D-PYTHON은 **키 부재 + venv 발견**을
+PASS로 보고 고른 경로를 적는다. 적어 둔 경로가 없어 대체된 경우는 WARN을 유지한다 — 그쪽은
+사람이 의도한 환경이 거기 없다는 뜻이다. 어느 쪽이든 Doctor는 명령을 돌리지 않으므로 그
+인터프리터로 검사가 성공한다는 말은 하지 않는다.
 
 ## 현재 확인된 상태
 
 | 확인 | 결과 | 시점과 주체 |
 |---|---|---|
-| `tests/test_doctor.py` | 246 passed, 1 skipped | 2026-11-22, Claude가 지정 인터프리터로 실행 |
-| Full 세 단계 | `ruff check` 통과, `ruff format --check` 71 files already formatted, **651 passed · 1 skipped** | 2026-11-22, Claude 실행 |
-| 이 저장소 자체 진단 | PASS 24 · WARN 5 · FAIL 0, 종료 0 | 2026-11-22, Claude 실행 |
+| `tests/test_doctor.py` | 246 passed, 1 skipped | 2026-11-22, Claude가 지정 인터프리터로 실행 (Doctor 구현 직후) |
+| Full 세 단계 | `ruff check` 통과, `ruff format --check` 71 files already formatted, **651 passed · 1 skipped** | 2026-11-22, Claude 실행 (Doctor 구현 직후) |
+| 이 저장소 자체 진단 | PASS 24 · WARN 5 · FAIL 0, 종료 0 | 2026-11-22, Claude 실행 (Doctor 구현 직후) |
+| `tests/test_doctor.py` | 259 passed, 1 skipped | 2026-11-22, Claude 실행 (`harness-quality-ci` 구현 뒤) |
+| 이 저장소 자체 진단 | PASS 26 · WARN 1 · FAIL 0, 종료 0 | 2026-11-22, Claude 실행 (`harness-quality-ci` 구현 뒤). 사라진 WARN 넷은 없는 경로를 가리킨 D-SCAFFOLD 3건(`pyproject.toml` 둘, 매핑의 `src/`)과 `.claude/harness.json`의 D-MAPPING 1건이다. **D-PYTHON은 기준 실행에서도 PASS였다** — 그때는 `python` 키가 있었다. 키를 지웠을 때 나던 메시지 결함을 고친 것은 별도 개선이고, 이 넷에 들어가지 않는다 |
 
 1건 skip은 POSIX 실행 권한 비트 검사다. **Linux에서는 검증하지 않았다** — Windows 로컬
 보고이며, 반대 OS의 경로 분류는 순수 입력 테스트로만 덮었다.

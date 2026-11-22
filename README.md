@@ -57,7 +57,9 @@ git clone --branch template/v2.1 --depth 1 https://github.com/JungHwyKim/my-harn
 ### 적용 직후 고칠 네 곳
 
 1. `CLAUDE.md` — 프로젝트 목적과 항상 지켜야 할 공통 규칙
-2. `.claude/harness.json` — Python 경로, 소스·테스트 경로, Quality Profile
+2. `.claude/harness.json` — 추적 경로, Fast 매핑, Quality Profile. 이 저장소의 사본은
+   **하네스 자신을 개발하는 설정**이라 매핑이 `.claude/harness/` → `tests/`를 가리킨다.
+   대상 프로젝트에서는 그 값을 자기 소스·테스트 경로로 바꾼다
 3. `.claude/wiki/overview/` — 디렉터리, 진입점, 관련 문서 링크
 4. `.claude/wiki/knowledge/` — 현재 유효한 계약과 정책
 
@@ -185,9 +187,10 @@ V1과 V2 모두 프로젝트에 복사해 쓰지만, V2는 Context와 기록의 
 
 ## 검증과 주의 사항
 
-개발 의존성은 저장소 전용 가상환경에 둔다. `.claude/harness.json`의 `python`이
-`.venv/Scripts/python.exe`를 가리키므로, 그 자리에 환경이 없으면 Quality Profile이 다른
-인터프리터로 조용히 대체된다.
+개발 의존성은 저장소 전용 가상환경에 둔다. 이 저장소의 `.claude/harness.json`에는 `python`
+키가 **없다**. 그래서 하네스가 `.venv/Scripts/python.exe`와 `.venv/bin/python`을 차례로 찾고,
+Windows와 Linux가 각자의 환경을 쓴다. 두 자리 모두 없으면 지금 돌고 있는 인터프리터로
+조용히 대체되므로, 검사가 통과했다는 보고만으로 그 환경에서 돌았다고 볼 수 없다.
 
 ```powershell
 python -m venv .venv
@@ -195,13 +198,28 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip check
 ```
 
-Full Quality Profile의 세 단계는 직접 실행할 수 있다.
+Quality Profile은 명령을 손으로 적지 않고 전용 CLI로 돌린다. 훅이 돌리는 것과 **같은 설정**을
+읽으므로 기준이 갈라지지 않는다.
 
 ```powershell
-.\.venv\Scripts\python.exe -m ruff check .
-.\.venv\Scripts\python.exe -m ruff format --check .
-.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe .claude\harness\scripts\run_quality.py --profile full
 ```
+
+Fast는 무엇이 바뀌었는지를 받아야 대상을 정할 수 있다. 경로는 프로젝트 상대 경로이고 여러
+번 지정한다.
+
+```powershell
+.\.venv\Scripts\python.exe .claude\harness\scripts\run_quality.py --profile fast --changed .claude/settings.json --changed tests/conftest.py
+```
+
+종료 코드는 셋이다. `0`은 PASS 또는 SKIP, `1`은 stage 실패, `2`는 사용 오류와 설정 결함이다.
+**SKIP은 0이지만 검사 통과가 아니다** — 돌릴 대상이 없었다는 뜻이고, 출력이 그렇게 적는다.
+앞 단계가 실패해 도달하지 못한 단계는 `NOT RUN`으로 따로 표시한다.
+
+같은 Profile을 GitHub Actions의 `harness-quality` workflow가 Windows와 Linux에서 돌린다.
+Python 3.12로 `.venv`를 새로 만들고, 고정 의존성을 깔고, `pip check`와 Doctor를 지난 뒤
+위 `--profile full`을 실행한다. 한 OS가 실패해도 다른 OS의 결과를 끝까지 받는다. workflow에
+Profile 명령을 다시 적지 않는 것이 그 파일의 규칙이다.
 
 - `.venv/`는 Git 관리 대상이 아니다. 개발 의존성은 `requirements.txt`에 버전을 고정한다.
 - `requirements.txt`는 ASCII로 유지한다. pip가 그 파일을 로케일 인코딩으로 읽어서,

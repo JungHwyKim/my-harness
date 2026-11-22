@@ -27,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 HARNESS_ROOT = REPO_ROOT / ".claude" / "harness"
 HOOKS_DIR = HARNESS_ROOT / "hooks"
 SETTINGS = REPO_ROOT / ".claude" / "settings.json"
+HARNESS_JSON = REPO_ROOT / ".claude" / "harness.json"
 
 # settings.json 의 command 문자열에서 훅 스크립트 이름을 뽑는다.
 # 명령은 `python "${CLAUDE_PROJECT_DIR}/.claude/harness/hooks/X.py"` 모양이다.
@@ -83,16 +84,39 @@ def _wired() -> list[tuple[str, str, str]]:
     return rows
 
 
-# (스크립트, 이벤트) -> settings.json 의 timeout. 안 적혀 있으면 None
-def _wired_timeouts() -> dict[tuple[str, str], int | None]:
+# (스크립트, 이벤트) -> settings.json 에 적힌 timeout **전부**.
+#
+# **목록인 것이 요점이다.** 한때 이 함수는 키마다 값을 덮어써서, 같은 스크립트가 한 이벤트에
+# 여러 group 으로 배선되면 **마지막 값만** 남았다. `auto_test_check.py` 는 PostToolUse 에
+# 두 번 배선돼 있다(`Write|Edit` 과 `Bash|PowerShell`). 그래서 한쪽 group 의 예산을 낮춰도
+# 다른 쪽 값으로 검사가 통과한다. 지금은 둘 다 120 이라 차이가 없고, **차이가 없다는 것이
+# 이런 구멍이 오래 남는 이유다** — 이 파일이 애초에 존재하는 그 실패 모드다
+def _wired_timeout_values() -> dict[tuple[str, str], list[int | None]]:
     config = json.loads(SETTINGS.read_text(encoding="utf-8"))
-    budgets: dict[tuple[str, str], int | None] = {}
+    budgets: dict[tuple[str, str], list[int | None]] = {}
     for event, groups in config.get("hooks", {}).items():
         for group in groups:
             for hook in group.get("hooks", []):
                 for script in _SCRIPT_RE.findall(hook.get("command", "")):
-                    budgets[(script, event)] = hook.get("timeout")
+                    budgets.setdefault((script, event), []).append(hook.get("timeout"))
     return budgets
+
+
+# 그 중 **제일 좁은** 예산. 하나라도 적혀 있지 않으면 None 이다 — 예산 없는 group 이
+# 하나라도 있으면 그 group 에서는 훅이 언제 죽는지 모른다
+def _wired_timeouts() -> dict[tuple[str, str], int | None]:
+    tightest: dict[tuple[str, str], int | None] = {}
+    for key, values in _wired_timeout_values().items():
+        tightest[key] = None if any(v is None for v in values) else min(values)
+    return tightest
+
+
+# 같은 (스크립트, 이벤트)에 group 이 둘 이상이면 전부 모아야 한다
+def test_duplicate_wiring_keeps_every_timeout():
+    values = _wired_timeout_values()[("auto_test_check.py", "PostToolUse")]
+
+    assert len(values) == 2, f"PostToolUse 배선 두 group 이 모이지 않았다: {values}"
+    assert _wired_timeouts()[("auto_test_check.py", "PostToolUse")] == min(values)
 
 
 # 배선된 스크립트가 실제로 존재해야 한다. 이름을 바꾸면 훅이 조용히 사라진다
@@ -206,6 +230,69 @@ def test_every_hook_timeout_is_budgeted():
             f"{script} 의 {sorted(declared - budgeted)} 가 _TIMEOUT_BUDGETS 에 없다. "
             "어느 이벤트에서 도는 제한인지 표에 적어라"
         )
+
+
+# V2 Profile 의 stage 예산. **V1 상수 검사와 다른 계약이라 따로 둔다.**
+#
+# 위 `_TIMEOUT_BUDGETS` 는 훅 코드의 `*_TIMEOUT_SEC` 를 본다. **V2 경로는 그 상수를 쓰지
+# 않는다** — `harness.json` 의 stage timeout 을 읽어 `_quality` 가 돌린다. 그래서 V1 검사가
+# 초록인 동안 V2 예산은 아무도 보지 않았고, 실제로 `full` 의 test stage 600 이 Stop 예산
+# 600 과 **같아진** 상태였다. 같으면 훅은 자기 사유를 내기 전에 밖에서 죽는다.
+#
+# **합으로 재는 것도 V1 과 다르다.** V1 은 개별 검사가 스스로 사유를 남기는 것이 목적이라
+# 최댓값만 봤다(위 주석). V2 는 한 훅 호출이 Profile 의 stage 를 **순서대로** 돌리므로 앞
+# 단계가 쓴 시간이 뒤 단계의 예산을 깎는다. 개별 최댓값만 보면 그만큼이 통째로 빠진다.
+#
+# 여유 30초는 훅 자신이 설정·git·마커를 보는 시간이다. 이 검사는 **설정 값끼리의** 비교이고,
+# OS 스케줄링 지연까지 보장하는 deadline 구현이 아니다
+V2_PROFILE_WIRING = {
+    ("fast", "post_change"): ("auto_test_check.py", "PostToolUse"),
+    ("full", "stop"): ("auto_test_check.py", "Stop"),
+    ("full", "pre_commit"): ("pre_commit_check.py", "PreToolUse"),
+}
+HOOK_OVERHEAD_SEC = 30
+
+
+# (개별 초과 목록, 합계 초과인가). 순수 함수라 합성 값으로도 잰다
+def budget_violations(timeouts: list[int], outer: int) -> tuple[list[int], bool]:
+    over = [value for value in timeouts if value >= outer]
+    return over, sum(timeouts) + HOOK_OVERHEAD_SEC > outer
+
+
+# 합계만 넘는 설정도 잡혀야 한다. **이 단정이 없으면 위 함수가 최댓값 검사로 퇴화해도 모른다**
+def test_budget_violations_catches_the_sum_alone():
+    # 셋 다 바깥보다 짧은데 순서대로 돌면 넘는다 — V1 규칙은 이것을 통과시킨다
+    over, sum_over = budget_violations([120, 120, 700], 900)
+    assert over == [] and sum_over is True
+
+    over, sum_over = budget_violations([120, 120, 600], 600)
+    assert over == [600] and sum_over is True
+
+    over, sum_over = budget_violations([120, 120, 540], 900)
+    assert over == [] and sum_over is False
+
+
+@pytest.mark.parametrize(("profile", "trigger"), sorted(V2_PROFILE_WIRING))
+def test_v2_stage_budget_fits_the_hook_timeout(profile: str, trigger: str):
+    config = json.loads(HARNESS_JSON.read_text(encoding="utf-8"))
+    default = importlib.import_module("_quality").DEFAULT_TIMEOUT_SEC
+    stages = config["quality"]["profiles"][profile]["stages"]
+    timeouts = [stage.get("timeout", default) for stage in stages]
+
+    script, event = V2_PROFILE_WIRING[(profile, trigger)]
+    outer = _wired_timeouts().get((script, event))
+    assert outer is not None, f"{script} 가 {event} 에 배선돼 있지 않거나 timeout 이 없다"
+
+    over, sum_over = budget_violations(timeouts, outer)
+    assert not over, (
+        f"{profile}/{trigger} 의 stage timeout {over} 가 {script}({event}) 의 "
+        f"settings.json timeout={outer} 이상이다 — 훅이 사유를 남기지 못하고 죽는다"
+    )
+    assert not sum_over, (
+        f"{profile}/{trigger} 의 stage 합계 {sum(timeouts)}초 + 여유 {HOOK_OVERHEAD_SEC}초가 "
+        f"{script}({event}) 의 settings.json timeout={outer} 를 넘는다 — 순서대로 돌리므로 "
+        "개별 상한만으로는 모자라다. stage 를 줄이거나 바깥 예산을 늘려라"
+    )
 
 
 # 모든 훅 모듈이 임포트돼야 한다. 문법 오류는 "훅이 조용히 안 돎" 으로만 드러난다

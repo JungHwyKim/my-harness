@@ -449,6 +449,19 @@ def _is_artifact(relative: Path) -> bool:
     return any(part in _ARTIFACT_DIRS for part in relative.parts)
 
 
+# 같은 판정을 저장소 기준 **문자열** 경로로 묻는 자리.
+#
+# **공개해 둔 이유는 소비자가 둘로 늘었기 때문이다.** 아래 두 탐색 함수는 `Path` 를 들고
+# 있어서 사설 함수로 충분했는데, `auto_test_check.classify()` 와 `run_quality.py` 는 훅
+# 입력과 `--changed` 로 받은 문자열을 분류한다. 거기서 산물 폴더 목록을 다시 열거하면
+# `_ARTIFACT_DIRS` 가 세 벌이 되고, 그러면 한쪽만 고쳐진다 — 이 모듈이 있는 이유가 그것이다
+def is_artifact(relative: str) -> bool:
+    value = relative.replace("\\", "/").strip("/")
+    if not value:
+        return False
+    return _is_artifact(Path(value))
+
+
 # 기준 시각 이후에 바뀐 파일들의 저장소 기준 경로. 판단이 안 서면 None.
 #
 # `changed_paths()`(git)와 쓰임이 다르다. 저쪽은 "커밋 안 된 것"을 묻고 이쪽은 "이 시각
@@ -520,6 +533,55 @@ def prompt_text(payload: dict) -> str:
         if isinstance(value, str) and value.strip():
             return value
     return ""
+
+
+# 막지 않고 세션당 한 번만 알린다. `block()` 의 짝이다. 이번 호출이 알렸으면 True.
+#
+# **가운데 줄이 이 함수가 공용부에 있는 이유다.** `plan_log_check.py:166` 과
+# `plan_interview_check.py:176` 이 이미 같은 묶음(마커 한 번 → 인코딩 고정 → 출력)을 한 벌씩
+# 들고 있는데, 거기서 중요한 것은 `reconfigure` 다 — Windows 콘솔 기본 인코딩(cp949)으로는
+# 한국어 사유를 못 내보내 UnicodeEncodeError 로 훅이 죽는다. `block()` 이 stderr 쪽에 같은
+# 이유로 같은 줄을 들고 있고, 그 교훈이 훅마다 복사되면 한쪽만 고쳐진다.
+#
+# **JSON 으로 내는 것은 저 두 자리와 다른 선택이고, 이벤트가 달라서다.** 저쪽은
+# UserPromptSubmit 이라 stdout 이 그대로 모델 컨텍스트가 된다. PostToolUse 는 그 보장이
+# 없으므로, 이 저장소가 이미 네 자리에서 쓰는 `systemMessage`(사용자용 한 줄)와
+# `additionalContext`(모델용 본문)를 명시한다.
+#
+# **마커를 먼저 잡고 출력한다.** 출력이 실패해도 다시 떠들지 않는 쪽을 고른다 — 매 도구
+# 호출에 같은 줄이 붙으면 그것이 소음이고, 소음이 되면 사람이 SKIP_* 를 켠다
+def notify_once(
+    namespace: str,
+    session_id: str,
+    *,
+    event: str,
+    summary: str,
+    message: str,
+) -> bool:
+    if not claim_session(namespace, session_id):
+        return False
+    # 인코딩 고정은 **되면 좋은 것**이고 출력이 목적이다. 두 줄을 한 try 에 두면 테스트의
+    # 캡처 스트림처럼 `reconfigure` 가 없는 자리에서 알림이 통째로 사라진다
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError, ValueError):
+        pass
+    try:
+        print(
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": event,
+                        "additionalContext": message,
+                    },
+                    "systemMessage": summary,
+                },
+                ensure_ascii=False,
+            )
+        )
+    except (OSError, ValueError, UnicodeEncodeError):
+        return False
+    return True
 
 
 # 종료를 막고 사유를 모델에게 넘긴다. 이 함수는 돌아오지 않는다

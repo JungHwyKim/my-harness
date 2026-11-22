@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from dataclasses import dataclass
 
 import _hookutil
 import _quality
@@ -58,6 +59,10 @@ _OK_RETURNCODES = (0, 5)
 
 # Stop 게이트가 세션당 한 번만 막게 하는 마커 이름
 GATE_NS = "claude_autotest_gate"
+
+# 매핑 누락을 세션당 한 번만 알리게 하는 마커 이름. **게이트와 다른 namespace 인 것이
+# 요점이다** — 알림이 게이트 마커를 쓰면 알림 한 번이 그 세션의 Stop 게이트를 삼킨다
+NOTICE_NS = "claude_autotest_mapping_notice"
 
 # 이 아래 .py 가 바뀌면 전체 게이트 대상으로 본다.
 # 프로젝트가 `source_prefixes` 로 준다 — 없으면 아래 `_CONFIG` 가 None 이라 검사가 안 돈다
@@ -135,21 +140,45 @@ _MAPPINGS: tuple[tuple[str, str], ...] = _load_mappings()
 #
 # 설정에서는 **사전**으로 받는다(`경로: 이유`) — 목록으로 두면 «빠뜨린 게 아님» 을 적는
 # 자리가 없어져, 이 집합이 존재하는 이유 자체가 사라진다. 목록도 받아는 준다
-def _load_unmapped() -> tuple[str, ...]:
+def _raw_unmapped() -> object:
     if _hookutil.is_v2():
         quality = _hookutil.config().get("quality")
-        raw = quality.get("unmapped_by_design") if isinstance(quality, dict) else None
-    else:
-        section = _hookutil.check_config("auto_test") or {}
-        raw = section.get("unmapped_by_design")
-    if isinstance(raw, dict):
-        return tuple(key for key in raw if isinstance(key, str))
-    if isinstance(raw, list):
+        return quality.get("unmapped_by_design") if isinstance(quality, dict) else None
+    section = _hookutil.check_config("auto_test") or {}
+    return section.get("unmapped_by_design")
+
+
+def _load_unmapped() -> tuple[str, ...]:
+    raw = _raw_unmapped()
+    if isinstance(raw, (dict, list)):
         return tuple(key for key in raw if isinstance(key, str))
     return ()
 
 
+# 경로 -> 적어 둔 사유. 목록으로 준 설정에는 사유가 없으므로 빈 문자열이다.
+#
+# **사유를 따로 꺼내는 이유는 읽는 쪽이 늘었기 때문이다.** 위 주석이 말하는 «값 옆에 이유를
+# 둔다» 는 사람이 설정을 읽을 때의 이야기였는데, 이제 `run_quality.py` 가 SKIP 을 출력할 때
+# 그 이유를 함께 적는다. 키만 꺼내면 거기서 이유가 다시 사라진다.
+#
+# **키 집합이 `UNMAPPED_BY_DESIGN` 과 정확히 같아야 한다.** 사유가 문자열이 아닌 항목을
+# 여기서 떨어뜨리면, 그 경로가 «의도적 제외» 로는 잡히는데 «사유 있는 제외» 로는 안 잡혀
+# 분류가 매핑 누락으로 떨어진다. 그래서 거르지 않고 빈 문자열로 받는다
+def _load_unmapped_reasons() -> dict[str, str]:
+    raw = _raw_unmapped()
+    if isinstance(raw, dict):
+        return {
+            key: value if isinstance(value, str) else ""
+            for key, value in raw.items()
+            if isinstance(key, str)
+        }
+    if isinstance(raw, list):
+        return {key: "" for key in raw if isinstance(key, str)}
+    return {}
+
+
 UNMAPPED_BY_DESIGN: tuple[str, ...] = _load_unmapped()
+UNMAPPED_REASONS: dict[str, str] = _load_unmapped_reasons()
 
 
 # 이 경로를 고쳤을 때 돌릴 테스트 대상. 없으면 None (조용히 통과)
@@ -174,7 +203,14 @@ def test_target_for(raw_path: str) -> str | None:
         # 진짜 원인은 `_hookutil` 의 산물 디렉터리 제외였고, 이 줄은 두 번째 방어선이다
         if not name.endswith(".py"):
             return None
-        return rel if name.startswith("test_") else None
+        if name.startswith("test_"):
+            return rel
+        # **V2 에서 보조 파일이 `tests/` 전체로 가는 것이 여기 추가된 분기다.**
+        # `conftest.py`·`_escape_hatches.py` 는 영향 범위가 테스트 전부인데, V1 에서는 그것을
+        # Stop 의 전체 게이트에 넘겼다. V2 는 추적 경로가 하네스 자신이라 그 전제가 깨진다 —
+        # `tests/conftest.py` 만 고친 변경은 Fast 대상이 없어 stage 가 SKIP 되고, 그 SKIP 이
+        # «검사 통과» 로 보고된다. V1 은 그대로 `None` 이다(기존 테스트가 잠근다)
+        return "tests/" if _hookutil.is_v2() else None
 
     # 최장 접두사가 이긴다
     best: tuple[str, str] | None = None
@@ -183,6 +219,152 @@ def test_target_for(raw_path: str) -> str | None:
         if matches and (best is None or len(prefix) > len(best[0])):
             best = (prefix, target)
     return best[1] if best else None
+
+
+# ───────────────────────── 경로 분류 ─────────────────────────
+
+# 분류 원인. **`test_target_for()` 의 `None` 하나로는 못 가르기 때문에 생긴 자리다.**
+# 저 함수는 네 가지 다른 사정에 같은 `None` 을 돌려준다 — 루트 밖, 의도적 제외, `tests/`
+# 아래 비Python, 매핑 없음. 그 중 **마지막 하나만 결함**이고 나머지는 정상이다. 읽는 쪽이
+# `None` 만 보고 추측하면 평범한 파일에 매핑 누락 판정이 떨어진다.
+#
+# **문자열 상수인 이유**는 이 값이 CLI 출력과 테스트 단정에 그대로 실리기 때문이다. Enum 으로
+# 두면 `.value` 를 잊은 자리에 `Cause.ARTIFACT` 가 찍히는데, 그건 실패가 아니라 오타로 보인다
+CAUSE_OUTSIDE = "outside"
+CAUSE_ARTIFACT = "artifact"
+CAUSE_UNTRACKED = "untracked"
+CAUSE_EXCLUDED = "excluded"
+CAUSE_EXCLUDED_NO_REASON = "excluded_no_reason"
+CAUSE_NON_PYTHON_TEST = "non_python_test"
+CAUSE_NO_MAPPING_NEEDED = "no_mapping_needed"
+CAUSE_UNMAPPED = "unmapped"
+CAUSE_TARGET = "target"
+
+# **실행 대상이 되는 원인.** 나머지는 정책상 검사하지 않기로 한 것이므로 stage 인자에
+# 넣지 않는다.
+#
+# 이 집합이 없을 때 무슨 일이 났는지가 그 이유다 — 「매핑이 필요한가」만으로 실행 여부를
+# 정하면, `{mapped_targets}` 를 쓰지 않는 Profile 에서 **제외한 파일이 그대로 stage 인자로
+# 넘어가 실행된다.** 출력은 그 파일을 SKIP 이라고 적으면서 명령은 돌아가고 PASS 가 된다.
+# "무엇을 실행할 수 있나"와 "매핑이 필요한가"는 다른 질문이다
+RUNNABLE_CAUSES = (CAUSE_TARGET, CAUSE_NO_MAPPING_NEEDED)
+
+# 설정 결함으로 드러내야 하는 원인. CLI 는 실행 전에 ERROR, 훅은 비차단 알림이다
+PROBLEM_CAUSES = (CAUSE_UNMAPPED, CAUSE_EXCLUDED_NO_REASON)
+
+
+@dataclass(frozen=True)
+class Classified:
+    path: str
+    cause: str
+    target: str | None = None
+    reason: str = ""
+
+
+# 이 경로를 Fast 가 어떻게 다루는가, 그리고 **왜** 그런가.
+#
+# 우선순위는 사용 오류 → 생성물 → 비추적 → 의도적 제외 → 테스트 특례 → 일반 매핑이다.
+# 순서가 계약이다: 생성물을 비추적보다 먼저 보지 않으면 `tests/__pycache__/*.pyc` 가 추적
+# 경로 안이라 «매핑 없음» 으로 떨어지고, 의도적 제외를 테스트 특례보다 먼저 보지 않으면
+# 일부러 뺀 `tests/` 하위 경로가 다시 대상이 된다.
+#
+# `mapping_required` 는 Profile 이 `{mapped_targets}` 를 쓰는지다. 안 쓰는 Profile 에서
+# «매핑이 없다» 는 결함이 아니다 — `_quality.profile_uses()` 의 주석 참조
+def classify(raw_path: str, *, mapping_required: bool = True) -> Classified:
+    rel = _hookutil.relative_to_root(raw_path)
+    if rel is None:
+        return Classified(
+            raw_path,
+            CAUSE_OUTSIDE,
+            reason="프로젝트 루트 밖이거나 해석할 수 없는 경로입니다.",
+        )
+
+    if _hookutil.is_artifact(rel):
+        return Classified(
+            rel,
+            CAUSE_ARTIFACT,
+            reason="도구가 만든 산물이라 사람이 고친 파일이 아닙니다.",
+        )
+
+    if not _matches_tracked(rel):
+        return Classified(rel, CAUSE_UNTRACKED, reason="quality.tracked_paths 밖입니다.")
+
+    excluded = _unmapped_reason(rel)
+    if excluded is not None:
+        return Classified(rel, CAUSE_EXCLUDED, reason=excluded)
+
+    # 등록은 됐는데 **사유가 없는** 자리. 이 명세가 허용한 것은 「사유가 적힌 의도적 제외」라,
+    # 빈 값·공백·문자열이 아닌 값은 그 조건을 채우지 못한다. 없는 사유를 대신 만들어
+    # 정상 제외로 바꾸면, 사람이 왜 뺐는지 아무도 모르는 채로 검사가 꺼진다.
+    #
+    # **V1 목록형은 그대로 받는다.** 저쪽 설정에는 사유를 적는 자리가 아예 없었으므로,
+    # 사유가 없는 것이 결함이 아니다
+    excluded_key = _unmapped_key_for(rel)
+    if excluded_key is not None:
+        if not _hookutil.is_v2():
+            return Classified(rel, CAUSE_EXCLUDED, reason="V1 목록형 의도적 제외입니다.")
+        return Classified(
+            rel,
+            CAUSE_EXCLUDED_NO_REASON,
+            reason=(
+                f"quality.unmapped_by_design 의 {excluded_key!r} 에 사유가 없습니다. "
+                "사유 없는 제외는 유효한 제외로 보지 않습니다."
+            ),
+        )
+
+    if rel.startswith("tests/") and not rel.rsplit("/", 1)[-1].endswith(".py"):
+        return Classified(
+            rel,
+            CAUSE_NON_PYTHON_TEST,
+            reason="테스트 특례는 Python 파일만 대상으로 잡습니다. 이 파일은 검사되지 않습니다.",
+        )
+
+    target = test_target_for(rel)
+    if target is not None:
+        return Classified(rel, CAUSE_TARGET, target=target)
+
+    if not mapping_required:
+        return Classified(
+            rel,
+            CAUSE_NO_MAPPING_NEEDED,
+            reason="이 Profile 의 stage 가 {mapped_targets} 를 쓰지 않아 매핑이 필요하지 않습니다.",
+        )
+
+    return Classified(
+        rel,
+        CAUSE_UNMAPPED,
+        reason=(
+            "추적 파일인데 quality.mappings 의 대상도 "
+            "quality.unmapped_by_design 의 사유도 없습니다."
+        ),
+    )
+
+
+# 의도적 제외에 걸리는 설정 key, 아니면 None. **최장 접두사가 이긴다** — 매핑 표와 같은
+# 규칙이라, 겹치는 항목에서 어느 사유가 나올지가 설정 순서에 좌우되지 않는다.
+#
+# `test_target_for()` 의 제외 판정과 **같은 비교여야 한다** — 어긋나면 한쪽은 제외로 보고
+# 다른 쪽은 매핑 누락으로 봐서, 설정이 맞는데도 알림이 뜬다
+def _unmapped_key_for(rel: str) -> str | None:
+    best: str | None = None
+    for key in UNMAPPED_REASONS:
+        if (rel == key or rel.startswith(key)) and (best is None or len(key) > len(best)):
+            best = key
+    return best
+
+
+# 그 자리에 **쓸 수 있는 사유**가 적혀 있으면 그것, 아니면 None.
+#
+# **빈 값에 대체 문구를 돌려주면 안 된다.** 한때 그렇게 해서, 사유를 비워 둔 설정이 사유를
+# 적은 설정과 같은 `CAUSE_EXCLUDED` 가 됐다 — 출력은 「사유가 비어 있습니다」라고 적으면서
+# 판정은 정상 제외였다. 공백만 적은 경우에는 그 대체 문구조차 안 나와 사유 칸이 빈 줄로
+# 찍혔다(실측). 사유의 유효성은 분류에 반영돼야 한다
+def _unmapped_reason(rel: str) -> str | None:
+    key = _unmapped_key_for(rel)
+    if key is None:
+        return None
+    why = UNMAPPED_REASONS.get(key, "")
+    return why.strip() or None
 
 
 # 테스트를 돌릴 파이썬. 찾는 방법은 `_hookutil` 한 자리에 있다 —
@@ -278,18 +460,64 @@ def _quality_failure(profile: str, result: _quality.StageResult) -> None:
     )
 
 
+# 추적 파일인데 매핑도 제외 사유도 없는 것을 세션당 한 번 알린다. **막지 않는다.**
+#
+# 막는 쪽이 아닌 이유가 이 함수의 전부다. 설정이 고쳐지기 전까지는 사람이 무엇을 고쳐도 이
+# 조건이 그대로라, 차단으로 두면 그 세션의 모든 도구 호출이 빨개진다 — 그러면
+# `SKIP_AUTOTEST=1` 이 습관이 되고 검사가 통째로 죽는다. `_hookutil` 의 WIKI_ROOT 주석이
+# 같은 실패를 기록하고 있다. 알림은 고칠 거리를 주고, 통과 여부는 건드리지 않는다.
+#
+# 「조용히 지나가는 것」과 「막는 것」 사이가 비어 있어서 생긴 자리다. 그 빈틈이 이 작업의 목적이다
+def _notify_unmapped(rows: list[Classified], session_id: str) -> None:
+    problems = [row for row in rows if row.cause in PROBLEM_CAUSES]
+    if not problems:
+        return
+
+    listed = "\n".join(f"- {row.path} — {row.reason}" for row in problems)
+    _hookutil.notify_once(
+        NOTICE_NS,
+        session_id,
+        event="PostToolUse",
+        summary=(
+            f"Fast 설정에 걸린 추적 파일 {len(problems)}건이 있어 그 변경은 검사되지 않았습니다."
+        ),
+        message=(
+            "아래 파일은 quality.tracked_paths 안인데 Fast 가 돌릴 대상이 없습니다. "
+            "이 파일만 고친 변경은 검사되지 않고 통과합니다.\n\n"
+            f"{listed}\n\n"
+            ".claude/harness.json 에서 둘 중 하나를 하세요 — quality.mappings 에 대상을 "
+            "추가하거나, 일부러 뺀 것이면 quality.unmapped_by_design 에 **사유와 함께** "
+            "등록하세요. 이 알림은 세션당 한 번만 나옵니다."
+        ),
+    )
+
+
 def _handle_v2_post_tool_use(payload: dict, session_id: str) -> None:
     if not _quality.profile_has_trigger("fast", "post_change"):
         return
     changed_files = _changed_files_for_call(payload, session_id)
     if not changed_files:
         return
-    targets = sorted({t for path in changed_files if (t := test_target_for(path)) is not None})
+
+    # 분류를 먼저 한다. 알림과 대상 계산이 **같은 판정**을 써야 하기 때문이다 —
+    # 두 벌로 두면 «알림은 떴는데 검사는 돌았다» 같은 모양이 생긴다
+    mapping_required = _quality.profile_uses("fast", "{mapped_targets}")
+    rows = [classify(path, mapping_required=mapping_required) for path in changed_files]
+    _notify_unmapped(rows, session_id)
+
+    # **분류 결과가 실행 입력을 정한다.** 유효한 대상이 함께 있으면 알린 뒤에도 그 검사는
+    # 돌리지만, 정책상 제외한 파일은 stage 인자에 넣지 않는다 — 넣으면 「SKIP 이라고 적고
+    # 실제로는 돌린다」가 된다. 전부 제외면 엔진을 아예 부르지 않는다
+    runnable = [row for row in rows if row.cause in RUNNABLE_CAUSES]
+    if not runnable:
+        return
+
+    targets = sorted({row.target for row in runnable if row.target is not None})
     _hookutil.touch_marker(CHECKED_NS, session_id)
     try:
         results = _quality.run_profile(
             "fast",
-            changed_files=tuple(changed_files),
+            changed_files=tuple(row.path for row in runnable),
             mapped_targets=tuple(targets),
         )
     except _quality.QualityConfigError as exc:

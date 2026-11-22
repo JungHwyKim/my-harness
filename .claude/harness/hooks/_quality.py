@@ -64,6 +64,26 @@ def profile_config(name: str) -> dict | None:
     return profile if isinstance(profile, dict) else None
 
 
+# 이 Profile 의 stage 중 하나라도 그 치환값을 쓰나.
+#
+# **매핑이 필요한지를 이 값으로 판단한다.** `{mapped_targets}` 를 쓰지 않는 Profile — 변경
+# 파일만 넘기는 언어 중립 명령이나 경로를 아예 안 보는 명령 — 에서는 «매핑이 없다» 가 결함이
+# 아니다. 그걸 안 가르면 pytest 매핑을 쓰지 않는 프로젝트가 영원히 누락 경고를 받는다.
+# `doctor.check_mapping()` 이 같은 판단을 하고 있어서 이름도 그쪽과 맞춘다
+def profile_uses(name: str, placeholder: str) -> bool:
+    profile = profile_config(name)
+    raw = profile.get("stages") if profile else None
+    if not isinstance(raw, list):
+        return False
+    for stage in raw:
+        if not isinstance(stage, dict):
+            continue
+        argv = stage.get("argv")
+        if isinstance(argv, list) and placeholder in argv:
+            return True
+    return False
+
+
 def profile_has_trigger(name: str, trigger: str) -> bool:
     profile = profile_config(name)
     raw = profile.get("triggers") if profile else None

@@ -1,25 +1,61 @@
 {
   "schema_version": 2,
   "wiki_root": ".claude/wiki/",
-  "python": ".venv/Scripts/python.exe",
-  "source_prefixes": ["src/", "tests/"],
+  "source_prefixes": [".claude/harness/", "tests/"],
   "harness_paths": [".claude/harness.json", ".claude/settings.json"],
   "history": {
     "plan": "history/plan/",
     "task": "history/task/",
     "verify": "history/verify/",
-    "tracked_paths": ["src/", "tests/", "pyproject.toml", ".claude/harness.json"]
+    "tracked_paths": [
+      ".claude/harness/",
+      "tests/",
+      ".claude/settings.json",
+      ".claude/harness.json",
+      "requirements.txt",
+      "ruff.toml"
+    ]
   },
   "quality": {
-    "tracked_paths": ["src/", "tests/", "pyproject.toml", ".claude/harness.json"],
+    "tracked_paths": [
+      ".claude/harness/",
+      "tests/",
+      ".claude/settings.json",
+      ".claude/harness.json",
+      "requirements.txt",
+      "ruff.toml",
+      ".github/workflows/"
+    ],
     "mappings": [
       {
-        "path": "src/",
+        "path": ".claude/harness/",
         "tests": "tests/",
-        "why": "제품 코드 변경에는 전체 단위 테스트가 대응한다"
+        "why": "훅·공유 모듈·스크립트·스키마가 서로 영향을 준다"
+      },
+      {
+        "path": ".claude/settings.json",
+        "tests": "tests/",
+        "why": "배선과 timeout 계약을 검증한다"
+      },
+      {
+        "path": ".claude/harness.json",
+        "tests": "tests/",
+        "why": "매핑·Profile·Doctor 계약에 영향을 준다"
+      },
+      {
+        "path": "requirements.txt",
+        "tests": "tests/",
+        "why": "도구 버전을 바꾼 뒤 회귀를 확인한다"
+      },
+      {
+        "path": "ruff.toml",
+        "tests": "tests/",
+        "why": "Ruff 설정 변경 뒤 회귀를 확인한다. Ruff 자체 실행은 Full이 담당한다"
       }
     ],
-    "unmapped_by_design": {},
+    "unmapped_by_design": {
+      ".github/workflows/": "Python 테스트로 hosted CI 실행을 증명할 수 없다. Full과 실제 CI 결과로 확인한다"
+    },
     "profiles": {
       "fast": {
         "triggers": ["post_change"],
@@ -29,7 +65,7 @@
             "label": "영향 범위 테스트",
             "argv": ["{python}", "-m", "pytest", "{mapped_targets}", "-q"],
             "timeout": 90,
-            "success_codes": [0, 5]
+            "success_codes": [0]
           }
         ]
       },
@@ -38,18 +74,21 @@
         "stages": [
           {
             "id": "lint",
+            "label": "Ruff lint",
             "argv": ["{python}", "-m", "ruff", "check", "."],
             "timeout": 120
           },
           {
             "id": "format",
+            "label": "Ruff format 확인",
             "argv": ["{python}", "-m", "ruff", "format", "--check", "."],
             "timeout": 120
           },
           {
             "id": "test",
+            "label": "전체 테스트",
             "argv": ["{python}", "-m", "pytest", "-q"],
-            "timeout": 600
+            "timeout": 540
           }
         ]
       }

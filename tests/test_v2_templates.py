@@ -1,4 +1,13 @@
-"""새 프로젝트용 V2 설정과 Context Router 템플릿의 최소 계약."""
+"""이 저장소의 **개발용** V2 설정과 Context Router의 최소 계약.
+
+**한때 이 파일은 「새 프로젝트용 설정」을 잰다고 적혀 있었다.** `.claude/harness.json` 하나가
+개발용 설정과 배포 예시를 겸하고 있었기 때문이다. 그 설정이 하네스 자신을 개발하는 값으로
+바뀌면서(매핑이 `.claude/harness/` → `tests/`) 그 설명은 더 이상 맞지 않는다 — 대상
+프로젝트에는 `.claude/harness/`를 재는 `tests/`가 없다.
+
+배포용 기본 설정을 따로 떼는 것은 `tasks/template-core-packs.md`의 몫이다. 그때까지 이
+저장소에는 범용 설치물로 쓸 설정이 없고, 이 파일이 재는 것은 **개발 설정이 성립하는가**뿐이다.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +18,7 @@ REPO = Path(__file__).resolve().parents[1]
 CLAUDE_DIR = REPO / ".claude"
 
 
-def test_example_config_loads_both_quality_profiles(load_hook) -> None:
+def test_dev_config_loads_both_quality_profiles(load_hook) -> None:
     config = json.loads((CLAUDE_DIR / "harness.json").read_text(encoding="utf-8"))
     quality, _ = load_hook("_quality", config)
 
@@ -20,7 +29,7 @@ def test_example_config_loads_both_quality_profiles(load_hook) -> None:
     assert quality.profile_has_trigger("full", "pre_commit")
 
 
-def test_schema_and_example_agree_on_version() -> None:
+def test_schema_and_dev_config_agree_on_version() -> None:
     schema = json.loads(
         (CLAUDE_DIR / "harness" / "schemas" / "harness.schema.json").read_text(encoding="utf-8")
     )
