@@ -218,8 +218,10 @@ Fast는 무엇이 바뀌었는지를 받아야 대상을 정할 수 있다. 경�
 
 같은 Profile을 GitHub Actions의 `harness-quality` workflow가 Windows와 Linux에서 돌린다.
 Python 3.12로 `.venv`를 새로 만들고, 고정 의존성을 깔고, `pip check`와 Doctor를 지난 뒤
-위 `--profile full`을 실행한다. 한 OS가 실패해도 다른 OS의 결과를 끝까지 받는다. workflow에
-Profile 명령을 다시 적지 않는 것이 그 파일의 규칙이다.
+위 `--profile full`을 `--require-venv`와 함께 실행한다. 그 플래그는 하네스가 준비한 그
+`.venv`를 골랐는지 실행 전에 확인한다. 한 OS가 실패해도 다른 OS의 결과를 끝까지 받는다.
+workflow에 Profile 명령이나 판정 로직을 적지 않는 것이 그 파일의 규칙이다 — 거기 쓴 것은
+테스트가 없다.
 
 - `.venv/`는 Git 관리 대상이 아니다. 개발 의존성은 `requirements.txt`에 버전을 고정한다.
 - `requirements.txt`는 ASCII로 유지한다. pip가 그 파일을 로케일 인코딩으로 읽어서,

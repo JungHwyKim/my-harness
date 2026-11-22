@@ -99,6 +99,16 @@ Profile의 stage를 순서대로 돌리므로, 앞 단계가 쓴 시간이 뒤 �
 종료 코드는 `0`(PASS 또는 SKIP), `1`(stage 실패), `2`(사용 오류·설정 결함)다. SKIP은 0이지만
 **검사 통과가 아니다.** 앞 단계 실패로 도달하지 못한 단계는 `NOT RUN`으로 따로 적는다.
 
+`--require-venv`를 주면 **하네스가 고른 인터프리터가 이 프로젝트의 `.venv` 안인지**를 실행
+전에 확인하고, 아니면 ERROR로 끝낸다. CI가 그 플래그를 쓴다. 설정 경로와 두 venv 자리를 모두
+찾지 못해 현재 프로세스로 조용히 대체된 상태가 이 검사에 걸린다.
+
+**판정은 경로 문자열로 하고 symlink를 따라가지 않는다.** POSIX의 `.venv/bin/python`은 기반
+Python의 symlink라, `realpath()`로 풀어 비교하면 venv를 고른 것과 기반 Python을 고른 것이
+같은 경로로 모인다. Windows는 실행 파일을 복사해서 그 함정이 없다 — 즉 풀어서 비교하면 같은
+검사가 OS마다 다른 것을 잰다. 실제로 CI의 Linux job이 그 상태로 통과한 적이 있다
+(`git log --all -- .github/workflows/harness-quality.yml`).
+
 **훅의 `SKIP_*` 우회 변수가 이 명령에는 적용되지 않는다.** 저 변수는 「모델이 돌리는 자동
 검사를 잠시 끈다」는 뜻이고, 이 명령은 사람이나 CI가 일부러 돌리는 것이다. 환경변수 하나로
 CI 게이트가 꺼지면 그건 검사가 아니다. 출력 머리에도 같은 말이 적힌다. 반대로 자식 환경에서
@@ -164,11 +174,8 @@ Windows의 skip은 POSIX 권한 검사, Linux의 skip은 Windows 전용 경로 �
 
 - Windows/Linux hosted CI는 위 실행에서 성공한 것으로 보고됐다. 다른 Python 버전·러너,
   이후 변경까지 검증됐다는 뜻은 아니다. Codex의 이번 원격 재조회 한계도 위에 명시했다.
-- **Linux 인터프리터 일치 검사는 venv 식별을 엄밀히 증명하지 못한다.** workflow가 고른
-  경로와 `sys.executable`의 `realpath()`를 비교하는데, venv의 symlink와 기반 Python이 같은
-  경로로 풀릴 수 있다. 이번 실행 실패나 잘못된 환경 사용이 관측된 것은 아니며, CI 보고의
-  현재 명령 출력과 검사 결과는 별도로 남긴다. 후속 보강은 `.venv` 경계와 `sys.prefix` 또는
-  symlink를 따라가지 않은 실행 경로를 비교하고, 기반 Python 선택 시 실제 실패하는지 확인한다.
+- `--require-venv`는 **고른 경로가 `.venv` 안인지**만 본다. 그 venv에 pytest·Ruff가 깔려
+  있는지, 버전이 맞는지는 보지 않는다 — 그쪽은 `pip check`와 Full의 몫이다.
 - 테스트 fixture 같은 **`tests/` 아래 비Python 파일은 자동 검사 대상이 아니다.** 분류에서
   SKIP으로 사유를 적을 뿐이고, 그 파일의 내용이 맞는지는 아무 검사도 보지 않는다.
 - `pip check` 성공은 설치 일관성만 말한다. Full 통과와 구분한다.

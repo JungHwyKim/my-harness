@@ -62,51 +62,16 @@ jobs:
       - name: 설치 일관성 확인
         run: $VENV_PYTHON -m pip check
 
-      # 하네스가 **준비한 그 venv**를 고르는지 본다. 설정에 다른 경로가 남아 있으면 검사는
-      # 통과하면서 다른 환경에서 돈다 — 그 상태를 통과로 보고하지 않기 위한 단계다
-      - name: 인터프리터 일치 확인
-        run: |
-          $VENV_PYTHON - <<'PY'
-          import os
-          import sys
-
-          # **이 세 줄이 빠져서 Windows job 이 죽었다**(실측, run 45033603512). 두 단정은 다
-          # 통과했는데 마지막 성공 줄의 한국어를 찍다가 `UnicodeEncodeError: 'charmap'` 으로
-          # 끝났다 — Windows 러너의 stdout 기본 인코딩이 UTF-8 이 아니다.
-          #
-          # 이 저장소의 CLI 는 전부 자기 출력을 스스로 못 박는다(`doctor._print()`,
-          # `run_quality._print()`, `openwork/collect.py:638`). 「부르는 쪽이
-          # PYTHONIOENCODING 을 붙인다」는 규약은 이미 기각된 것이라
-          # (`_hookutil.child_env()` 주석), job 환경변수로 덮지 않고 여기서 못 박는다
-          try:
-              sys.stdout.reconfigure(encoding="utf-8")
-          except (AttributeError, OSError):
-              pass
-
-          sys.path.insert(0, os.path.join(".claude", "harness", "hooks"))
-          import _hookutil
-
-          # **루트를 먼저 본다.** 루트가 틀리면 아래 비교가 「둘 다 못 찾아서 같다」로 우연히
-          # 통과한다 — venv 를 못 찾았을 때의 대체값이 지금 돌고 있는 프로세스 자신이기 때문이다.
-          #
-          # `CLAUDE_PROJECT_DIR` 를 여기서 **설정하지 않는** 이유도 그것이다. Windows 러너의
-          # bash 에서 `$PWD` 는 `/d/a/...` 모양인데, Windows 의 `Path()` 는 그것을 현재 드라이브
-          # 기준 `C:\d\a\...` 로 읽는다(실측). 그러면 루트 탐색이 빗나가고 위 우연한 통과가 난다.
-          # 환경변수를 비워 두면 `_find_root()` 가 `os.getcwd()` 를 쓰고, 그쪽은 제대로 된 경로다
-          root = os.path.realpath(_hookutil.PROJECT_ROOT)
-          cwd = os.path.realpath(os.getcwd())
-          if root != cwd:
-              raise SystemExit(f"하네스가 잡은 루트가 다릅니다: {root} != {cwd}")
-
-          chosen = os.path.realpath(_hookutil.venv_python())
-          expected = os.path.realpath(sys.executable)
-          if chosen != expected:
-              raise SystemExit(f"하네스가 고른 인터프리터가 다릅니다: {chosen} != {expected}")
-          print(f"일치: {chosen}")
-          PY
-
       - name: Doctor 정적 진단
         run: $VENV_PYTHON .claude/harness/scripts/doctor.py
 
+      # `--require-venv` 가 하네스가 **준비한 그 venv**를 골랐는지 확인한다. 설정에 다른 경로가
+      # 남아 있거나 자동 탐색이 빗나가면, 검사는 통과하면서 다른 환경에서 돌기 때문이다.
+      #
+      # **한때 이 자리에 YAML 안에 쓴 Python 블록이 있었다.** 두 번 물렸다 — Windows 는 한국어
+      # 성공 줄에서 `UnicodeEncodeError` 로 죽었고(run 45033603512), Linux 는 `realpath()` 로
+      # 비교해 symlink 가 기반 Python 으로 풀려 **통과하면서 아무것도 증명하지 못했다**.
+      # 둘 다 「YAML 에 손으로 쓴 로직은 테스트가 없다」는 한 가지 원인이다. 그래서 판정을 CLI 로
+      # 옮겼고, 실패 주입까지 `tests/test_run_quality.py` 가 잠근다
       - name: Full Quality Profile
-        run: $VENV_PYTHON .claude/harness/scripts/run_quality.py --profile full
+        run: $VENV_PYTHON .claude/harness/scripts/run_quality.py --require-venv --profile full

@@ -73,7 +73,46 @@ def _parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="프로젝트 상대 파일 경로. 반복 지정한다. fast에만 쓴다.",
     )
+    parser.add_argument(
+        "--require-venv",
+        action="store_true",
+        help="하네스가 고른 인터프리터가 이 프로젝트의 .venv 안이 아니면 실행 전에 실패한다.",
+    )
     return parser
+
+
+# ───────────────────────── venv 경계 ─────────────────────────
+
+
+# 경로가 그 디렉터리 안인가. **`realpath()` 를 쓰지 않는 것이 요점이다.**
+#
+# POSIX 의 venv 는 `.venv/bin/python` 을 기반 Python 으로 **symlink** 한다. 그래서 양쪽을
+# `realpath()` 로 풀어 비교하면 둘 다 기반 Python 으로 모여, 하네스가 venv 대신 기반 Python 을
+# 골랐어도 같은 경로로 보인다(실측: CI 의 Linux job 이 그 모양으로 통과했다). Windows 는 venv 가
+# 실행 파일을 **복사**하므로 그 함정이 없다 — 즉 같은 검사가 OS 마다 다른 것을 재고 있었다.
+#
+# 문자열 정규화만 한다. `normcase` 는 Windows 의 대소문자 차이를, `abspath` 는 `./` 와 상대
+# 경로를 흡수한다. symlink 는 일부러 따라가지 않는다
+def _inside(path: str, directory: str) -> bool:
+    target = os.path.normcase(os.path.abspath(path))
+    base = os.path.normcase(os.path.abspath(directory))
+    return target == base or target.startswith(base + os.sep)
+
+
+# 고른 인터프리터가 이 프로젝트의 `.venv` 안인지 본다. 아니면 사유, 맞으면 None.
+#
+# **이 검사가 묻는 것은 하나다** — 「준비한 venv 를 골랐나」. 이 CLI 자신이 venv 안에서 도는지는
+# 묻지 않는다. 훅은 시스템 Python 으로 떠서 `.venv` 를 고르는 것이 정상이고, 그것을 실패로
+# 보면 정상 사용을 막는다
+def _venv_violation(root: Path, interpreter: str) -> str | None:
+    venv_dir = str(root / ".venv")
+    if not _inside(interpreter, venv_dir):
+        return (
+            f"고른 인터프리터가 이 프로젝트의 .venv 밖입니다: {interpreter}\n"
+            f"기대한 자리: {venv_dir}. `venv_python()` 이 설정 경로와 두 venv 자리를 모두 "
+            "찾지 못해 현재 프로세스로 대체된 상태일 수 있습니다."
+        )
+    return None
 
 
 # ───────────────────────── 입력 검증 ─────────────────────────
@@ -289,6 +328,14 @@ def main(argv: list[str] | None = None) -> int:
 
     interpreter = _hookutil.venv_python()
     header.append(f"인터프리터: {interpreter}")
+
+    if args.require_venv:
+        violation = _venv_violation(root, interpreter)
+        if violation is not None:
+            _print([*header, "", f"[ERROR] {violation}"])
+            return EXIT_ERROR
+        header.append("venv 확인: 고른 인터프리터가 이 프로젝트의 .venv 안입니다.")
+
     # **출력에 적는 것이 계약의 일부다.** docstring 과 테스트만 알고 있으면, 돌린 사람은
     # `SKIP_AUTOTEST=1` 이 켜진 환경에서 이 명령이 무엇을 했는지 알 수 없다
     header.append("훅 우회 변수(SKIP_*)는 이 명령에 적용되지 않습니다.")

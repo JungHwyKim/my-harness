@@ -646,6 +646,98 @@ def test_an_exclusion_with_a_reason_is_still_a_silent_skip(cli_project, tmp_path
     assert "전 영역에 영향을 주어" in proc.stdout
 
 
+# ───────────────── --require-venv (Linux guard 보강) ─────────────────
+
+
+# **이 검사가 생긴 이유는 CI 의 Linux job 이 통과해 놓고 아무것도 증명하지 못한 것이다.**
+# 예전 workflow 단계는 고른 경로와 `sys.executable` 을 각각 `realpath()` 로 비교했는데,
+# POSIX venv 의 `bin/python` 은 기반 Python 의 symlink 라 양쪽이 같은 파일로 모인다.
+# Windows 는 실행 파일을 복사하므로 그 함정이 없어서, 같은 단계가 OS 마다 다른 것을 재고 있었다
+def venv_stub(root: Path, relative: str) -> Path:
+    target = root / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("", encoding="utf-8")
+    return target
+
+
+# 준비한 venv 를 고르면 통과한다
+@pytest.mark.parametrize("relative", [".venv/Scripts/python.exe", ".venv/bin/python"])
+def test_require_venv_accepts_the_projects_own_venv(cli_project, tmp_path: Path, relative):
+    mark = tmp_path / "ran.txt"
+    config = cli_config(full={"triggers": ["stop"], "stages": [recording_stage(mark, None)]})
+    config["python"] = relative
+    root = cli_project(config)
+    venv_stub(root, relative)
+
+    proc = run_cli(root, "--profile", "full", "--require-venv")
+
+    assert proc.returncode == 0, proc.stdout
+    assert received(mark) == []
+    assert "venv 확인" in proc.stdout
+
+
+# **실패 주입: 기반 Python 을 고르게 만든다.** 설정의 `python` 이 `.venv` 밖을 가리키면
+# 검사가 실제로 거부해야 한다 — 이것이 예전 Linux 검사가 못 잡던 바로 그 상태다
+def test_require_venv_rejects_an_interpreter_outside_the_venv(cli_project, tmp_path: Path):
+    mark = tmp_path / "ran.txt"
+    config = cli_config(full={"triggers": ["stop"], "stages": [recording_stage(mark, None)]})
+    config["python"] = "기반파이썬"
+    root = cli_project(config)
+    venv_stub(root, "기반파이썬")
+
+    proc = run_cli(root, "--profile", "full", "--require-venv")
+
+    assert proc.returncode == 2, proc.stdout
+    assert received(mark) is None, "거부했는데 stage 가 돌았다"
+    assert ".venv 밖입니다" in proc.stdout
+
+
+# 설정 경로와 `.venv` 둘 다 없으면 `venv_python()` 은 현재 프로세스로 대체한다.
+# 그 대체값은 `.venv` 밖이므로 이 검사가 잡아야 한다 — 조용한 대체가 이 작업의 출발점이었다
+def test_require_venv_rejects_the_silent_fallback(cli_project, tmp_path: Path):
+    mark = tmp_path / "ran.txt"
+    config = cli_config(full={"triggers": ["stop"], "stages": [recording_stage(mark, None)]})
+    root = cli_project(config)  # .venv 를 만들지 않는다
+
+    proc = run_cli(root, "--profile", "full", "--require-venv")
+
+    assert proc.returncode == 2, proc.stdout
+    assert received(mark) is None
+    assert "대체된 상태일 수 있습니다" in proc.stdout
+
+
+# 플래그가 없으면 예전처럼 돈다. 이 검사는 CI 가 켜는 것이고 기본 동작이 아니다
+def test_without_the_flag_the_interpreter_is_not_policed(cli_project, tmp_path: Path):
+    mark = tmp_path / "ran.txt"
+    config = cli_config(full={"triggers": ["stop"], "stages": [recording_stage(mark, None)]})
+
+    proc = run_cli(cli_project(config), "--profile", "full")
+
+    assert proc.returncode == 0, proc.stdout
+    assert received(mark) == []
+    assert "venv 확인" not in proc.stdout
+
+
+# **symlink 를 따라가지 않는다.** POSIX 에서 `.venv/bin/python` 이 밖을 가리켜도 경계 판정은
+# 경로로 한다. 이 단정이 없으면 `realpath()` 로 되돌아가도 테스트가 초록이다
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX symlink 전용 분기")
+def test_require_venv_judges_by_path_not_by_symlink_target(cli_project, tmp_path: Path):
+    mark = tmp_path / "ran.txt"
+    config = cli_config(full={"triggers": ["stop"], "stages": [recording_stage(mark, None)]})
+    config["python"] = ".venv/bin/python"
+    root = cli_project(config)
+    outside = venv_stub(root, "기반파이썬")
+    link = root / ".venv" / "bin" / "python"
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(outside)
+
+    proc = run_cli(root, "--profile", "full", "--require-venv")
+
+    # 링크 대상은 `.venv` 밖이지만 **고른 경로**는 안쪽이다 — 경로로 판정하므로 통과한다
+    assert proc.returncode == 0, proc.stdout
+    assert "venv 확인" in proc.stdout
+
+
 def test_a_misplaced_script_refuses_to_run(cli_project, tmp_path):
     root = cli_project(cli_config())
     stray = tmp_path / "stray"
