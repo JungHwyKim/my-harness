@@ -806,3 +806,107 @@ instead of implying the tests had passed.
 - 완료 기준's 「Windows 로컬 Full과 두 OS hosted CI가 성공한다」 stays half open for the same reason as
   before.
 - The three implementation choices you accepted are unchanged; I did not revisit them.
+
+---
+
+# Hosted CI — run, failed once, green on both OSes
+
+- Date: 2026-11-22. Authorized by the user to commit, push `main`, monitor both jobs and record the
+  results here. The task 2 and task 3 spec files were explicitly excluded from the commit.
+- Commits: **`63201d2`** (the implementation, 20 files) and **`0e52390`** (one CI fix, below). Both are
+  on `main` at `origin`. `tasks/template-core-packs.md` and `tasks/template-install-smoke.md` remain
+  untracked, as instructed.
+
+## Both jobs pass
+
+Run **[45033823289](https://github.com/JungHwyKim/my-harness/actions/runs/45033823289)** on `0e52390` —
+conclusion **success**.
+
+| Job | Result | Duration | Link |
+|---|---|---|---|
+| `quality (ubuntu-latest)` | **success** | 16 s | [job 137243026598](https://github.com/JungHwyKim/my-harness/actions/runs/45033823289/job/137243026598) |
+| `quality (windows-latest)` | **success** | 44 s | [job 137243026924](https://github.com/JungHwyKim/my-harness/actions/runs/45033823289/job/137243026924) |
+
+Per-OS evidence, read from the job logs rather than inferred from the green tick:
+
+| Step | ubuntu-latest | windows-latest |
+|---|---|---|
+| `pip check` | `No broken requirements found.` | same |
+| Doctor | `PASS 26 · WARN 1 · FAIL 0` | same |
+| `ruff check` | `All checks passed!` | same |
+| `ruff format --check` | `75 files already formatted` | same |
+| `pytest -q` | **762 passed, 1 skipped** in 7.93 s | **762 passed, 1 skipped** in 23.37 s |
+| CLI verdict | `PASS 3 · FAIL 0 · SKIP 0 · NOT RUN 0` | same |
+
+The Linux counts match Windows exactly, including the single skip — that is
+`test_doctor.py`'s Windows-only branch test, which skips on POSIX while the POSIX
+permission-bit test runs. So the suite has no hidden platform gap: each OS skips exactly the one test
+written for the other.
+
+## The first run failed on Windows, and not where I expected
+
+Run **[45033603512](https://github.com/JungHwyKim/my-harness/actions/runs/45033603512)** on `63201d2`:
+ubuntu **success**, windows **failure** at 「인터프리터 일치 확인」.
+
+**Both of that step's assertions passed.** It died on the line after them:
+
+```text
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-1
+```
+
+`print(f"일치: {chosen}")` — the Korean success message — could not be encoded, because the Windows
+runner's stdout is not UTF-8 by default. The step verified what it was supposed to verify and then
+crashed reporting it.
+
+This is the same lesson this repo has already recorded three times. `_hookutil.child_env()` sets
+`PYTHONIOENCODING=utf-8` for child processes for exactly this; `block()` and `notify_once()` pin the
+encoding; `doctor._print()`, `run_quality._print()`, `openwork/collect.py:638` and
+`quiz/collect.py:416` all pin their own stdout. **My inline workflow script was the one place in the
+job that did not**, which is why the failure landed there and only there — the later Doctor and
+`run_quality` steps would have been fine.
+
+Fixed in `0e52390` by pinning the encoding in that script, not with a job-level `PYTHONIOENCODING`.
+Relying on the caller to attach it is a convention this repo considered and rejected
+(`_hookutil.child_env()`'s comment); the job-level variable would have hidden the fact that the script
+was the odd one out.
+
+Worth saying plainly: Round 2's R2-02 and the Task History entry both argued that this class of bug is
+what `_hookutil` exists to centralize, and I then wrote a fourth copy of the pattern by hand in YAML and
+left the encoding line out of it. The CI caught it on its first run, which is the point of having it.
+
+## A new limitation: the interpreter check is weaker on Linux than on Windows
+
+Not a blocker — both jobs pass and the check does catch what it was built for — but the two log lines
+side by side show it is not verifying the same thing on both OSes:
+
+```text
+ubuntu-latest   일치: /opt/hostedtoolcache/Python/3.12.16/x64/bin/python3.12
+windows-latest  일치: D:\a\my-harness\my-harness\.venv\Scripts\python.exe
+```
+
+On Windows a venv **copies** `python.exe`, so the comparison is genuinely between the prepared `.venv`
+and what the harness chose. On Linux `.venv/bin/python` is a **symlink** to the base interpreter, and the
+step compares `os.path.realpath()` of both sides — so both collapse to the hostedtoolcache binary. The
+consequence: on Linux the step would still pass if the harness had chosen the bare base interpreter
+instead of the venv, because the two realpath to the same file.
+
+The practical risk is small, since a bare interpreter has no pytest or ruff and the `Full Quality
+Profile` step would fail immediately. But the step's stated purpose is
+「준비한 그 venv 를 고르는지」, and on Linux it does not establish that. The fix would be to compare
+`sys.prefix` against the expected `.venv` directory, or compare the unresolved paths, instead of
+comparing resolved binaries. **I did not change it** — both jobs are green, the user's instruction for
+this round was to commit, push, monitor and report, and this is a new finding rather than one of the
+HQCI items. It is Codex's call whether to fold it into this task or carry it forward.
+
+## Completion criteria — the CI line now closes
+
+- 「Windows 로컬 Full과 두 OS hosted CI가 성공한다」 — **met.** Windows local Full passed
+  (762 passed · 1 skipped) and both hosted jobs passed on `0e52390` with the evidence above.
+- The spec's gate on starting task 2 (「두 OS 성공 근거를 확보하거나 사용자가 미검증 제약을 수용」) is
+  satisfied by evidence rather than by acceptance of an unverified constraint.
+- Still not done: the workflow YAML has never been parser-validated locally (PyYAML is not installed and
+  adding it would widen `requirements.txt`) — though two successful runs are stronger evidence than a
+  parser would have been.
+- The temporary task files stay in place until Codex's final review, as instructed. The handoff skill's
+  cleanup condition about content living in a verified commit is now satisfied for both of them —
+  they are in `63201d2`.
