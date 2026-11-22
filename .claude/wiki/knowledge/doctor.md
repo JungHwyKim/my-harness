@@ -283,11 +283,13 @@ PASS로 보고 고른 경로를 적는다. 적어 둔 경로가 없어 대체된
 | 이 저장소 자체 진단 | PASS 24 · WARN 5 · FAIL 0, 종료 0 | 2026-11-22, Claude 실행 (Doctor 구현 직후) |
 | `tests/test_doctor.py` | 259 passed, 1 skipped | 2026-11-22, Claude 실행 (`harness-quality-ci` 구현 뒤) |
 | 이 저장소 자체 진단 | PASS 26 · WARN 1 · FAIL 0, 종료 0 | 2026-11-22, Claude 실행 (`harness-quality-ci` 구현 뒤). 사라진 WARN 넷은 없는 경로를 가리킨 D-SCAFFOLD 3건(`pyproject.toml` 둘, 매핑의 `src/`)과 `.claude/harness.json`의 D-MAPPING 1건이다. **D-PYTHON은 기준 실행에서도 PASS였다** — 그때는 `python` 키가 있었다. 키를 지웠을 때 나던 메시지 결함을 고친 것은 별도 개선이고, 이 넷에 들어가지 않는다 |
+| Hosted CI / Windows·Linux | 양쪽 Doctor **PASS 26 · WARN 1 · FAIL 0**, Full **762 passed · 1 skipped** | 2026-11-22, Claude의 [run 45033823289](https://github.com/JungHwyKim/my-harness/actions/runs/45033823289) job 로그 확인 보고. 실행 코드 `0e52390`, 보고 커밋 `5f58805`. Codex는 2026-11-23 보고·커밋 대조, 원격 재조회는 연결 오류로 미실행 |
 
-1건 skip은 POSIX 실행 권한 비트 검사다. **Linux에서는 검증하지 않았다** — Windows 로컬
-보고이며, 반대 OS의 경로 분류는 순수 입력 테스트로만 덮었다.
+Windows 로컬 보고의 skip 1건은 POSIX 실행 권한 비트 검사다. 이후 hosted Linux에서는 그
+검사가 실행되고 Windows 전용 검사 1건이 skip된 것으로 보고됐다. 전체 CI의 근거와
+인터프리터 확인의 한계는 `quality-env.md`가 소유한다.
 
-이 저장소 진단의 WARN 5건은 모두 설치 상태가 아니라 이 저장소의 실제 설정이다 — `src/`와
+Doctor 구현 직후 이 저장소 진단의 WARN 5건은 모두 설치 상태가 아니라 당시 실제 설정이었다 — `src/`와
 `pyproject.toml` 미생성(D-SCAFFOLD 3건), `{python}`뿐이라 확인 대상이 없는
 D-EXEC 미검사 1건, 그리고 `.claude/harness.json`이 추적되지만 대응 테스트가 없다는
 D-MAPPING 1건이다. 마지막 1건은 `quality-env.md`가 산문으로 적어 둔 사실

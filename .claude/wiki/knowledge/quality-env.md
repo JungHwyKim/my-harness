@@ -140,6 +140,16 @@ CI 게이트가 꺼지면 그건 검사가 아니다. 출력 머리에도 같은
 | 전체 테스트 | **651 passed · 1 skipped**, 15.80~20.97초(세 번) | 2026-11-22, Claude가 지정 인터프리터로 실행. Fast가 하네스 한 파일 수정마다 치르는 비용이 이 값이다 |
 | `run_quality.py --profile full` | lint·format·test 세 단계 PASS, 종료 코드 0 | 2026-11-22, Claude가 새 CLI로 실행 |
 | Doctor | PASS 26 · WARN 1 · FAIL 0, 종료 0. 남은 WARN은 D-EXEC 「미검사」 | 2026-11-22, Claude 실행 |
+| Hosted CI / Ubuntu | `pip check`·Doctor·lint·format·Full 성공. **762 passed · 1 skipped / 7.93초**, format 75 files | 2026-11-22, Claude가 [run 45033823289](https://github.com/JungHwyKim/my-harness/actions/runs/45033823289)의 job 로그에서 확인해 `5f58805`에 보고. 실행 코드 `0e52390` |
+| Hosted CI / Windows | 같은 단계 성공. **762 passed · 1 skipped / 23.37초**, format 75 files | 같은 실행과 보고 커밋. Windows 최초 실패의 출력 인코딩 수정은 `0e52390` |
+
+2026-11-23 Codex는 위 보고와 커밋을 대조해 최종 리뷰했다. GitHub API·페이지 재조회는 이
+검토 환경의 연결 오류로 하지 못했으므로, 위 hosted 수치는 **Claude가 보존한 실행 보고**에
+근거한다. 실행 코드 뒤 `5f58805`는 리뷰 문서만 변경했다. 관련 코드와 로컬 Full의 이전
+독립 검증 근거는 작업 명세의 최종 리뷰에 있다.
+
+Windows의 skip은 POSIX 권한 검사, Linux의 skip은 Windows 전용 경로 검사다. 이는 현재
+테스트가 의도한 OS별 제외를 설명하며 모든 플랫폼 문제가 없음을 보장하지 않는다.
 
 **환경 구축 성공과 Full 통과는 따로 판정한다.** 위 수치를 이 문서에 적은 것은 실행 증거가
 임시 파일에만 남지 않게 하기 위해서다. 설치 자체의 실행 기록은 인수인계 절차의 임시 리뷰에
@@ -149,9 +159,13 @@ CI 게이트가 꺼지면 그건 검사가 아니다. 출력 머리에도 같은
 
 ## 보장하지 않는 것
 
-- **Linux와 hosted CI는 아직 검증하지 않았다.** 위 결과는 전부 Windows 로컬 보고다.
-  `.github/workflows/harness-quality.yml`은 작성했지만 원격에서 돈 근거가 없다. workflow
-  파일이 있다는 것과 CI가 통과한다는 것은 다르다.
+- Windows/Linux hosted CI는 위 실행에서 성공한 것으로 보고됐다. 다른 Python 버전·러너,
+  이후 변경까지 검증됐다는 뜻은 아니다. Codex의 이번 원격 재조회 한계도 위에 명시했다.
+- **Linux 인터프리터 일치 검사는 venv 식별을 엄밀히 증명하지 못한다.** workflow가 고른
+  경로와 `sys.executable`의 `realpath()`를 비교하는데, venv의 symlink와 기반 Python이 같은
+  경로로 풀릴 수 있다. 이번 실행 실패나 잘못된 환경 사용이 관측된 것은 아니며, CI 보고의
+  현재 명령 출력과 검사 결과는 별도로 남긴다. 후속 보강은 `.venv` 경계와 `sys.prefix` 또는
+  symlink를 따라가지 않은 실행 경로를 비교하고, 기반 Python 선택 시 실제 실패하는지 확인한다.
 - 테스트 fixture 같은 **`tests/` 아래 비Python 파일은 자동 검사 대상이 아니다.** 분류에서
   SKIP으로 사유를 적을 뿐이고, 그 파일의 내용이 맞는지는 아무 검사도 보지 않는다.
 - `pip check` 성공은 설치 일관성만 말한다. Full 통과와 구분한다.

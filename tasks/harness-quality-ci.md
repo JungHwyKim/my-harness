@@ -2,7 +2,7 @@
 
 - 작업 ID: `harness-quality-ci`
 - 실행 순번: **1 / 3**
-- 상태: 리뷰 대기 — HQCI-01~HQCI-03 해소, 코드 리뷰·Windows 로컬 검증 통과. Linux·hosted CI 검증 대기.
+- 상태: 완료 — 2026-11-23 최종 리뷰 승인. 보존된 두 OS hosted CI 보고 확인, 최신 판정 보존·임시 파일 정리 대기.
 - 명세: `tasks/harness-quality-ci.md`
 - 리뷰: `tasks/harness-quality-ci.review.md`
 - 선행 작업: 완료된 `quality-env-setup`, `doctor`. 환경 계약은
@@ -275,11 +275,12 @@ API 키·개인 노트·사용자 홈을 테스트 입력으로 사용하지 않
   HQCI-01~HQCI-03의 입력·설정 경계도 수정 후 재확인했다.
 - [x] CLI가 훅 우회 변수에 의해 생략되지 않고, 미도달 단계·수집 0건·자체 부작용의 범위가 검증된다.
 - [x] 이 저장소의 Fast는 수집 0건을 성공으로 인정하지 않는다. V1 호환 테스트는 유지된다.
-- [ ] Windows 로컬 Full과 두 OS hosted CI가 성공한다. 미검증이면 해당 항목은 열린 채로 둔다.
-  Windows 로컬 Full은 762 passed·1 skipped, 린트·포맷 PASS. hosted 두 OS는 아직 미실행이다.
+- [x] Windows 로컬 Full과 두 OS hosted CI가 성공한다.
+  실행 코드 `0e52390`, run `45033823289`의 Windows/Linux 성공 보고를 확인했다.
+  Codex의 원격 재조회는 연결 오류로 실패했으며 최종 판정의 근거와 한계를 아래에 기록했다.
 - [x] Knowledge와 README가 실제 추적·실행 방식과 일치한다. HQCI-N01 보완을 확인했다.
 - [x] Claude가 같은 ID의 리뷰에 실행 명령·인터프리터·결과·미실행 이유를 기록하고,
-  Codex가 이 명세에 현재 결과 판정과 남은 일을 반영했다. 완료 승인 판정은 아니다.
+  Codex가 이 명세에 최종 판정과 남은 보존·정리 작업을 반영했다.
 
 ## Codex 설계 리뷰 반영 — Round 1
 
@@ -483,6 +484,9 @@ Fast 전체 테스트를 중복 실행하지 않았다. Linux·hosted CI·YAML p
 
 ## Codex HQCI 수정 라운드 결과 리뷰 — 2026-11-22
 
+이 절의 CI 미검증 상태는 당시 기록이다. 2026-11-23 최종 리뷰에서 보존된 hosted CI
+보고를 확인해 완료 승인했다. 현재 판정은 아래 최종 리뷰와 머리글을 따른다.
+
 - 체크아웃: `C:\my-harness`, `main / 675b461` + 미커밋 구현 변경.
 - 대상: Claude의 `tasks/harness-quality-ci.review.md` 중
   「HQCI-01 … HQCI-03 — reproduced, fixed, re-verified」와 관련 코드·테스트·Knowledge.
@@ -548,3 +552,83 @@ parser 검증은 이번에도 하지 않았다.** 원격 두 OS job의 성공을
    **현재 이 리뷰만으로 미검증 제약 수용이 있었다고 간주하지 않는다.**
 4. 전체 완료 기준이 충족되기 전에는 상태를 완료로 바꾸거나 임시 명세·리뷰를 삭제하지 않는다.
    완료 뒤에도 커밋 또는 적절한 영구 문서로 보존됐는지 확인한 후 정리한다.
+
+## Codex hosted CI 최종 리뷰 — 2026-11-23
+
+- 체크아웃: `C:\my-harness`, `main / 5f58805`.
+- 대상: `tasks/harness-quality-ci.review.md`의 「Hosted CI — run, failed once, green on both OSes」,
+  구현 커밋 `63201d2`, CI 수정 `0e52390`, CI 보고 보존 커밋 `5f58805`.
+- 판정: **구현 완료 승인. 기존 HQCI-01~HQCI-03은 해소 상태이고, 새로 막는 지적은 없다.**
+  두 OS hosted CI 성공의 보존된 보고를 완료 근거로 수용한다. 최신 판정 보존과 임시 파일 정리는
+  구현 완료와 별도로 남긴다. 2번 `template-core-packs`의 선행 작업 완료 조건도 충족한다.
+
+### 확인한 결과와 근거 범위
+
+성공 실행은 [run 45033823289](https://github.com/JungHwyKim/my-harness/actions/runs/45033823289),
+실행 코드 `0e52390`이다. 아래 수치는 **Claude가 job 로그에서 확인해 `5f58805`에 보존한 보고**다.
+
+| 항목 | Ubuntu | Windows |
+|---|---|---|
+| job | `quality (ubuntu-latest)` success / 16초 | `quality (windows-latest)` success / 44초 |
+| job URL | [137243026598](https://github.com/JungHwyKim/my-harness/actions/runs/45033823289/job/137243026598) | [137243026924](https://github.com/JungHwyKim/my-harness/actions/runs/45033823289/job/137243026924) |
+| 설치 일관성 | `No broken requirements found.` | 동일 |
+| Doctor | PASS 26 · WARN 1 · FAIL 0 | 동일 |
+| lint / format | PASS / 75 files already formatted | 동일 |
+| pytest | **762 passed · 1 skipped / 7.93초** | **762 passed · 1 skipped / 23.37초** |
+| 수동 CLI | PASS 3 · FAIL 0 · SKIP 0 · NOT RUN 0 | 동일 |
+
+Codex가 직접 확인한 것은 다음과 같다.
+
+- 로컬 Git 객체에서 구현 `63201d2`와 CI 수정 `0e52390`을 읽었다. 수정은 workflow의
+  인터프리터 확인용 Python 코드에서 stdout UTF-8을 고정하는 내용이며, Profile·훅·제품 동작을
+  추가로 바꾸지 않았다. Windows의 성공 메시지 출력 중 UnicodeEncodeError라는 보고와 부합한다.
+- `0e52390`부터 현재 `5f58805`까지 diff는 **리뷰 파일의 보고 추가뿐**이다. 현재 런타임 코드가
+  CI 성공 보고의 실행 코드와 달라졌다는 근거는 없다. 로컬 `origin/main`도 같은 리비전이다.
+  이는 원격을 새로 fetch해 실시간 상태를 확인했다는 뜻은 아니다.
+- 두 인수인계 파일이 `63201d2`에 들어 있고, 새 hosted 보고가 `5f58805`에 추가된 것을 확인했다.
+  따라서 hosted 결과가 미추적 파일에만 있다는 이전 제약은 해소됐다.
+- 이전 독립 로컬 검증은 Full **762 passed · 1 skipped**, 린트·포맷 PASS와 13개 probe다.
+  새 원격 수치를 그때 직접 실행한 결과인 것처럼 바꾸지 않는다.
+
+**원격 재조회 한계:** 이번 검토의 `gh run view`·`gh run list`는 `api.github.com` 연결 오류로
+실패했다. 웹 조회도 실패했고 브라우저는 세션 연결 오류로 페이지를 열지 못했다. 따라서
+Codex가 GitHub 화면·API·job 로그를 직접 다시 확인했다는 주장은 하지 않는다. 최종 판정은
+보존된 실행 보고, 그 실행 코드 및 이후 diff, 앞선 독립 코드 검증을 대조한 결과다.
+
+### Linux 인터프리터 확인 한계 — 비차단 후속 항목
+
+보고서의 지적은 타당하다. 현재 workflow는 선택된 경로와 `sys.executable`을 각각
+`realpath()`로 비교한다. Linux venv의 symlink가 기반 Python으로 풀리면 기반 Python을
+잘못 선택해도 같은 경로로 보일 수 있다. 따라서 이 한 단계만으로 「준비한 그 venv를 선택함」을
+엄밀히 증명했다고 표현하면 안 된다.
+
+이번 완료를 막는 새 지적으로는 다루지 않는다. 현재 설정은 venv 자동 탐색이고, 이번 CI
+실행에서 잘못된 환경 사용이나 검사 실패가 보고된 것은 아니다. 이미 수행한 코드 검토·
+실행 보고의 명령·Full 결과를 함께 완료 근거로 삼으며, **guard의 위음성 가능성**은
+`.claude/wiki/knowledge/quality-env.md`의 현재 한계로 보존했다. 「기반 Python에는 pytest·Ruff가
+없어 반드시 다음 단계가 실패한다」는 설명에는 의존하지 않는다. 러너의 설치 상태는 별개다.
+
+후속 보강 기준은 `.venv` 디렉터리와 `sys.prefix` 또는 symlink를 따라가지 않은 경로를
+비교하고, 준비한 venv 대신 기반 Python을 선택하는 실패 주입이 검사에서 실제로 거부되는지
+확인하는 것이다. 그 변경이 구현되면 두 OS CI를 다시 확인한다. 이번 최종 리뷰에서 workflow를
+고치거나 새 원격 실행을 시작하지 않았다.
+
+### 문서·검증·보존 판정
+
+- 영구 Knowledge 두 곳의 「Linux·hosted CI 미검증」 설명을 이번 보고의 결과·출처·리비전과
+  원격 재조회 한계로 갱신했다. `doctor.md`의 과거 WARN·skip 기록은 과거 시점으로 구분했다.
+- Linux의 Windows 전용 skip과 Windows의 POSIX 전용 skip이 서로 교대한다는 보고는 수용한다.
+  두 OS의 테스트 개수가 같다는 사실을 **숨은 플랫폼 결함이 전혀 없음**의 증명으로 쓰지는 않는다.
+- workflow를 hosted 서비스가 실행한 근거가 보고돼 있으므로 별도 로컬 YAML parser 미설치는
+  완료를 막지 않는다. 이를 위해 새 개발 의존성을 추가하지 않는다.
+- 이번에는 명세·Knowledge 문서만 수정한다. 기존 코드 테스트는 해당 코드의 이전 독립
+  Full과 hosted 실행 보고로 확인했고 같은 전체 테스트를 재실행하지 않았다. 문서 diff·공백·
+  참조와 workflow Python 블록의 문법을 확인한다.
+- **보존·정리 대기:** 이 최종 판정과 이번 Knowledge 갱신은 아직 커밋되지 않았다.
+  Claude는 최신 내용이 확인된 커밋 또는 필요한 정보의 영구 문서 보존이라는 기존 조건을
+  확인한 뒤 명세·리뷰를 정리한다. `63201d2` 하나에 최신 hosted 보고와 이번 최종 판정까지
+  모두 들어 있다고 주장하지 않는다. 작업 2·3의 명세는 정리 대상이 아니다.
+
+현재 남은 일은 최신 판정의 보존·임시 파일 정리와 위 비차단 후속 보강이다. 이 작업의
+구현 완료를 위해 다시 고쳐야 할 blocking finding은 없다. 인수인계 파일을 삭제하거나
+커밋·푸시하는 동작은 이번 최종 리뷰에서 수행하지 않는다.
