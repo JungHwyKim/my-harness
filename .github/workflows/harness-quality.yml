@@ -70,6 +70,19 @@ jobs:
           import os
           import sys
 
+          # **이 세 줄이 빠져서 Windows job 이 죽었다**(실측, run 45033603512). 두 단정은 다
+          # 통과했는데 마지막 성공 줄의 한국어를 찍다가 `UnicodeEncodeError: 'charmap'` 으로
+          # 끝났다 — Windows 러너의 stdout 기본 인코딩이 UTF-8 이 아니다.
+          #
+          # 이 저장소의 CLI 는 전부 자기 출력을 스스로 못 박는다(`doctor._print()`,
+          # `run_quality._print()`, `openwork/collect.py:638`). 「부르는 쪽이
+          # PYTHONIOENCODING 을 붙인다」는 규약은 이미 기각된 것이라
+          # (`_hookutil.child_env()` 주석), job 환경변수로 덮지 않고 여기서 못 박는다
+          try:
+              sys.stdout.reconfigure(encoding="utf-8")
+          except (AttributeError, OSError):
+              pass
+
           sys.path.insert(0, os.path.join(".claude", "harness", "hooks"))
           import _hookutil
 
