@@ -146,7 +146,10 @@ CI 게이트가 꺼지면 그건 검사가 아니다. 출력 머리에도 같은
 2026-11-23 Codex는 위 보고와 커밋을 대조해 최종 리뷰했다. GitHub API·페이지 재조회는 이
 검토 환경의 연결 오류로 하지 못했으므로, 위 hosted 수치는 **Claude가 보존한 실행 보고**에
 근거한다. 실행 코드 뒤 `5f58805`는 리뷰 문서만 변경했다. 관련 코드와 로컬 Full의 이전
-독립 검증 근거는 작업 명세의 최종 리뷰에 있다.
+독립 검증 근거는 작업 명세의 최종 리뷰에 있고, **그 임시 파일은 정리되어 사라졌으므로 보존
+커밋에서 읽는다** — `git show a91ad2e:tasks/harness-quality-ci.md`의 「Codex hosted CI 최종
+리뷰 — 2026-11-23」절과 `git show a91ad2e:tasks/harness-quality-ci.review.md`다. 경로로 다시
+찾을 때는 `git log --all -- tasks/harness-quality-ci.md`를 쓴다.
 
 Windows의 skip은 POSIX 권한 검사, Linux의 skip은 Windows 전용 경로 검사다. 이는 현재
 테스트가 의도한 OS별 제외를 설명하며 모든 플랫폼 문제가 없음을 보장하지 않는다.
