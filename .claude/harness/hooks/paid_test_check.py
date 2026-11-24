@@ -3,9 +3,11 @@
 schema_version 2에서는 `checks.expensive_tests`가 marker와 사유를 정의한다. 아래 integration·
 LlamaParse/OpenAI 설명은 schema_version 1 프로젝트의 기존 보호 동작을 설명한다.
 
-`-m integration` 테스트는 LlamaParse/OpenAI 에 **실제 과금**을 일으킨다. 이 저장소는
-그 사실을 CLAUDE.md, `rag-code-review`·`plan-log`·`task-log` 스킬, `code-reviewer`
-에이전트까지 다섯 곳에 적어뒀지만 전부 모델을 향한 **설득**이다. 반면 그보다 덜
+`-m integration` 테스트는 LlamaParse/OpenAI 에 **실제 과금**을 일으킨다 — 이 훅이 나온
+V1 RAG 저장소의 사례다. 그 저장소는 그 사실을 CLAUDE.md, `rag-code-review`·`plan-log`·
+`task-log` 스킬, `code-reviewer` 에이전트까지 다섯 곳에 적어뒀지만 전부 모델을 향한
+**설득**이었다. **그 파일들이 이 설치물에 있다는 뜻은 아니다** — 공통 설치물에는 RAG 스킬과
+에이전트가 없고, 위 목록은 과거 사례로만 읽는다. 반면 그보다 덜
 치명적인 "커밋 전 검사"는 `pre_commit_check.py` 로 하네스에 못 박혀 있었다. 이 훅은
 그 비대칭을 없앤다 — 제일 비싼 실수를 제일 약한 장치로 막고 있던 상태를 뒤집는다.
 

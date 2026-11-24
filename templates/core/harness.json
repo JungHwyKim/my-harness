@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "wiki_root": ".claude/wiki/",
+  "source_prefixes": [],
+  "harness_paths": [],
+  "history": {
+    "plan": "history/plan/",
+    "task": "history/task/",
+    "verify": "history/verify/",
+    "tracked_paths": []
+  },
+  "quality": {
+    "tracked_paths": [],
+    "mappings": [],
+    "profiles": {
+      "fast": {
+        "triggers": [],
+        "stages": []
+      },
+      "full": {
+        "triggers": [],
+        "stages": []
+      }
+    }
+  },
+  "checks": {
+    "openwork": {
+      "sources": []
+    },
+    "expensive_tests": {
+      "pytest_markers": [],
+      "reason": "이 프로젝트의 유료 테스트 마커를 아직 정하지 않았습니다. 정하기 전까지 유료 테스트 승인 검사는 비활성입니다."
+    }
+  }
+}

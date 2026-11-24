@@ -36,7 +36,7 @@ Doctor는 이 상태를 D-PYTHON PASS로 본다. 키가 없는 것은 결함이 
 | Profile | 트리거 | 단계 | 비고 |
 |---|---|---|---|
 | `fast` | `post_change` | 매핑된 대상의 `pytest -q` | timeout 90. `success_codes`가 `[0]`이라 **수집 0건은 실패**다 |
-| `full` | `stop`, `pre_commit` | `ruff check .` → `ruff format --check .` → `pytest -q` | timeout 120·120·540 |
+| `full` | `stop`, `pre_commit` | `ruff check .` → `ruff format --check .` → `pytest -q -rs` | timeout 120·120·540. `-rs`가 **어느 테스트가 왜 skip됐는지**를 출력에 남긴다 |
 
 `success_codes`를 `[0]`으로 둔 것은 **실제로 돌렸는데 수집이 0건인 상태**를 통과와 가르기
 위해서다. 작성 중인 빈 `test_*.py`가 흔한 원인이고, 그때는 실패 메시지에 「수집된 테스트
@@ -55,6 +55,8 @@ pytest의 종료 코드가 나오지 않는다. 그 자리는 아래 분류가 �
 | `tests/` | 직접 테스트는 그 파일, 보조 Python은 `tests/` | `test_target_for()`의 V2 특례다 |
 | `requirements.txt`, `ruff.toml` | `tests/` | 도구·설정 변경 뒤 회귀를 확인한다 |
 | `.github/workflows/` | 없음. `unmapped_by_design`에 사유를 적었다 | Python 테스트로 hosted CI 실행을 증명할 수 없다 |
+| `packs/` | `tests/` | 선택 구성의 파일 집합과 문서의 실행 경로가 manifest·패키징 계약의 입력이다 |
+| `templates/` | `tests/` | 배포 템플릿과 manifest가 내보내기 계약을 정한다 |
 
 하네스 코드 한 파일만 고쳐도 Fast가 전체 테스트를 돌린다. 정밀 매핑은 하지 않았다 — 훅·공유
 모듈·스키마가 서로 영향을 주어 부분 실행의 근거가 약하다. 그 비용은 아래 실측에 있다.
@@ -69,9 +71,16 @@ pytest의 종료 코드가 나오지 않는다. 그 자리는 아래 분류가 �
 것」이라, 사유가 없으면 그 목적을 채우지 못한다. 그 상태는 매핑 누락과 같게 다룬다(CLI는
 ERROR, 훅은 알림, Doctor는 WARN). V1의 목록형 제외는 사유 자리가 없었으므로 그대로 받는다.
 
-**문서·스킬 파일 변경에는 매핑된 검사가 없다.** `.claude/skills/`나 Wiki는 추적 경로 밖이라
-`fast`가 돌릴 대상이 없다. 그때는 돌리지 않은 이유를 보고하고, 검사가 통과했다고 적지
-않는다.
+**문서라고 다 추적 밖인 것은 아니다 — 자리에 따라 다르다.** 활성 `.claude/skills/`와 Wiki는
+종전처럼 추적 경로 밖이라 `fast`가 돌릴 대상이 없다. 그때는 돌리지 않은 이유를 보고하고,
+검사가 통과했다고 적지 않는다.
+
+반면 `packs/`와 `templates/` 아래의 **같은 종류의 문서**는 추적하고 `tests/`로 매핑한다.
+그쪽 SKILL.md의 실행 경로와 외부 전제, 배포 템플릿의 문구가 **설치 계약의 입력**이어서
+경로 참조·분류 테스트가 그것을 읽기 때문이다. 그래서 pack 문서 한 줄을 고쳐도 Fast가 전체
+테스트를 돌린다 — 그 비용은 의도한 것이다.
+
+이 비대칭이 헷갈리는 자리다. 기준은 「문서인가」가 아니라 **「내보내기 계약에 들어가는가」**다.
 
 **`full`의 두 트리거는 조건이 다르다.** `pre_commit`은 `git commit`을 보면 경로와 무관하게
 돌린다. `stop`은 그렇지 않다 — `_v2_session_changes()`가 추적 경로의 변경을 찾지 못하면
@@ -90,6 +99,13 @@ Profile의 stage를 순서대로 돌리므로, 앞 단계가 쓴 시간이 뒤 �
 
 여유 30초는 훅이 설정·git·마커를 보는 시간이다. `tests/test_hook_wiring.py`가 이 표를
 설정에서 직접 읽어 검사한다. 개별 상한만 비교하던 V1 규칙은 V1 상수에만 적용된다.
+
+**Fast의 90초가 넉넉하다고 전제하지 않는다.** Fast는 추적 경로가 바뀌면 전체 테스트를
+돌리고, 그 전체가 2026-11-24~25에 **38.97~65.15초**였다(837~851건, 열 번). 2026-11-22의
+15.80~20.97초(651건)와 비교하면 남은 여유는 약 70초에서 **약 25~51초**로 줄었다. 흩어짐이
+커서 배율은 못 쓰고, 원인도 특정하지 않았다 —
+`history/verify/2026-11-24-full-suite-runtime-regression.md`에 열 관측값과 추정, 다시 재는
+방법이 있다. 90초에 가까워지면 timeout을 올리는 것과 매핑을 정밀화하는 것 중에서 고른다.
 
 ## 수동 실행
 
@@ -148,6 +164,8 @@ CI 게이트가 꺼지면 그건 검사가 아니다. 출력 머리에도 같은
 | 설치 일관성 | `pip check` 종료 코드 0, `No broken requirements found.` | 2026-11-20, Codex 직접 확인 |
 | Full 세 단계 | `ruff check` 통과, `ruff format --check`는 70 files already formatted, **405 passed**(8.32초) | 2026-11-20, Claude가 세 단계를 재실행해 보고. Codex는 그 검토에서 재실행하지 않았다 |
 | 전체 테스트 | **651 passed · 1 skipped**, 15.80~20.97초(세 번) | 2026-11-22, Claude가 지정 인터프리터로 실행. Fast가 하네스 한 파일 수정마다 치르는 비용이 이 값이다 |
+| 전체 테스트 (pack 분리 구현 후) | **851 passed · 5 skipped**(Codex 환경은 848 passed · 8 skipped, 총수 856으로 같다). 열 번 관측해 **38.97~65.15초**. Fast 예산 90초에 대한 여유는 관측에 따라 약 25~51초다 | 2026-11-24~25, Claude와 Codex가 각각 Full로 실행. 배율·원인 모두 미특정 — `history/verify/2026-11-24-full-suite-runtime-regression.md` |
+| 배포 설치물 Doctor | **PASS 11 · WARN 7 · FAIL 0**, 종료 0. 빈 Full 수동 호출은 ERROR / 종료 2 | 2026-11-24, Claude가 exporter 출력에서 실행. 설치물의 인터프리터·훅 실행은 미검증 — `history/verify/2026-11-24-deployment-default-baseline.md` |
 | `run_quality.py --profile full` | lint·format·test 세 단계 PASS, 종료 코드 0 | 2026-11-22, Claude가 새 CLI로 실행 |
 | Doctor | PASS 26 · WARN 1 · FAIL 0, 종료 0. 남은 WARN은 D-EXEC 「미검사」 | 2026-11-22, Claude 실행 |
 | Hosted CI / Ubuntu | `pip check`·Doctor·lint·format·Full 성공. **762 passed · 1 skipped / 7.93초**, format 75 files | 2026-11-22, Claude가 [run 45033823289](https://github.com/JungHwyKim/my-harness/actions/runs/45033823289)의 job 로그에서 확인해 `5f58805`에 보고. 실행 코드 `0e52390` |

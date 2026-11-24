@@ -1,0 +1,14 @@
+# 하네스와 Python이 만드는 생성물
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# 로컬 에이전트 작업 폴더. 머신마다 다르고 공유하지 않는다.
+# 이 제외를 정한 이유와 기각한 대안은 하네스 **원본 저장소**가 소유하며,
+# 이 설치물에는 그 History가 없다.
+.agents/
+.codex/
+
+# `.claude/wiki/history/`는 ignore하지 않는다 — 결정의 이유를 보존하는 자리다.

@@ -4,6 +4,22 @@
 자리를 가른다.** 받는 쪽의 절차는 `README.md`의 「빠른 시작」이, 무엇이 따라오는지는 같은
 문서의 표가 소유한다. 이 문서는 내보내는 쪽의 계약이다.
 
+**배포 ref와 exporter 출력은 다른 것이다.** 아래 「두 가지 배포 경로」가 그 구분을 둔다.
+
+## 두 가지 배포 경로
+
+| 경로 | 무엇인가 | 담기는 것 |
+|---|---|---|
+| `template/<버전>` ref | `main`에서 끊어 **초기 History만 비운** 스냅샷. 저장소 구조가 그대로 있다 | 개발용 설정, `tests/`, CI, `packs/`·`templates/`와 exporter까지 전부 |
+| `export_template.py` 출력 | manifest가 고른 파일만 담은 **새 설치물** | 공통 구성 + 고른 pack. 개발용 설정·`tests/`·exporter는 없다 |
+
+**ref를 새 공통 설치물과 같다고 재정의하지 않는다.** ref는 「이 저장소의 사본에서 기록만
+비운 것」이고, 설치물은 「분류를 통과한 파일만 모은 것」이다. 전자는 하네스를 **개발하거나
+포크**하려는 쪽을 위한 것이고, 후자는 **다른 프로젝트에 넣으려는** 쪽을 위한 것이다.
+
+새 프로젝트에 하네스를 넣는 기본 경로는 **exporter 출력**이다. 분류·manifest·종료 코드
+계약은 [template-layout.md](template-layout.md)가 소유한다.
+
 ## 두 자리
 
 | 자리 | 하는 일 |
@@ -82,8 +98,13 @@ git show --name-status --format= HEAD
 
 배포 ref가 버리는 것은 결정의 **이유**이고 규칙 자체는 영구 문서에 있다 — 인수인계 절차와
 작업 ID 규칙은 `.claude/skills/handoff/SKILL.md`, 유료 테스트 계약은
-`paid-test-approval.md`, 검증 환경 계약은 `quality-env.md`, `.agents/`·`.codex/` 제외는
-`.gitignore`의 주석이다. **배포 ref에서만 읽을 수 있는 규칙은 두지 않는다.**
+`paid-test-approval.md`, 검증 환경 계약은 `quality-env.md`, 내보내기 분류와 exporter 계약은
+`template-layout.md`, `.agents/`·`.codex/` 제외는 `.gitignore`의 주석이다.
+**배포 ref에서만 읽을 수 있는 규칙은 두지 않는다.**
+
+같은 이유로 **설치물에서만 읽을 수 없는 규칙도 두지 않는다.** 위 목록 중 `template-deploy.md`와
+`template-layout.md`는 소스 전용이므로, 설치물이 알아야 할 것은 출력의
+`HARNESS-INSTALL.md`와 배포 Knowledge가 따로 담는다.
 
 ## 현재 상태
 

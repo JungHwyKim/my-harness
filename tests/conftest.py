@@ -27,8 +27,18 @@ HOOKS_DIR = REPO_ROOT / ".claude" / "harness" / "hooks"
 # 임시 저장소를 만들어 쓴다. 뜻이 바뀐 것을 이름으로 알리려 아래에서 REPO_ROOT 를 쓴다
 PROJECT_ROOT = REPO_ROOT
 
-# 스킬이 부르는 수집기들. 훅과 달리 **패키지**라 그 폴더가 아니라 부모를 얹는다
-SCRIPT_DIRS = (REPO_ROOT / ".claude" / "harness" / "scripts",)
+# 스킬이 부르는 수집기들. 훅과 달리 **패키지**라 그 폴더가 아니라 부모를 얹는다.
+#
+# quiz 는 선택 구성이라 `packs/interview/` 로 옮겼다. 저장소 **전역 기본 구성에서는 빠지지만
+# 완전히 안 보이는 것은 아니다** — `packs/interview/` 아래를 작업하는 동안에는 디렉터리 범위
+# 스킬로 노출된다(실측: `history/task/2026-11-24-packs-are-not-a-non-loading-location.md`).
+# 분류는 `.claude/wiki/knowledge/template-layout.md`. 테스트는 **옮긴 원본**을 재고
+# 활성 위치에 사본을 두지 않는다 — 사본을 두면 둘이 갈라져서 어느 쪽이 설치되는지
+# 알 수 없게 된다. 그래서 pack 쪽 scripts 부모도 함께 얹는다
+SCRIPT_DIRS = (
+    REPO_ROOT / ".claude" / "harness" / "scripts",
+    REPO_ROOT / "packs" / "interview" / ".claude" / "harness" / "scripts",
+)
 
 # 모듈 수준에서 얹는다. conftest 는 같은 폴더의 테스트 모듈보다 먼저 임포트되므로
 # 이 시점이면 테스트가 `import _hookutil` 하기 전이 보장된다

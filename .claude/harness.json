@@ -24,7 +24,9 @@
       ".claude/harness.json",
       "requirements.txt",
       "ruff.toml",
-      ".github/workflows/"
+      ".github/workflows/",
+      "packs/",
+      "templates/"
     ],
     "mappings": [
       {
@@ -51,6 +53,16 @@
         "path": "ruff.toml",
         "tests": "tests/",
         "why": "Ruff 설정 변경 뒤 회귀를 확인한다. Ruff 자체 실행은 Full이 담당한다"
+      },
+      {
+        "path": "packs/",
+        "tests": "tests/",
+        "why": "선택 구성의 파일 집합과 문서의 실행 경로가 manifest·패키징 계약의 입력이다"
+      },
+      {
+        "path": "templates/",
+        "tests": "tests/",
+        "why": "배포 템플릿과 manifest가 내보내기 계약을 정한다"
       }
     ],
     "unmapped_by_design": {
@@ -87,7 +99,7 @@
           {
             "id": "test",
             "label": "전체 테스트",
-            "argv": ["{python}", "-m", "pytest", "-q"],
+            "argv": ["{python}", "-m", "pytest", "-q", "-rs"],
             "timeout": 540
           }
         ]

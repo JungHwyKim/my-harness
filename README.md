@@ -46,22 +46,37 @@ git clone --branch template/v2.1 --depth 1 https://github.com/JungHwyKim/my-harn
 
 ### 기존 프로젝트에 적용
 
-이 저장소의 `CLAUDE.md`와 `.claude/`를 가져온다. Codex도 함께 쓴다면 `AGENTS.md`도
-가져온다. 기존 `CLAUDE.md`, `AGENTS.md`, `.claude/settings.json`이 있다면 덮어쓰지 말고,
-프로젝트의 규칙과 `hooks` 항목을 병합한다.
+**이 저장소를 clone하는 것으로 대상 프로젝트 설정이 끝나지 않는다.** clone은 하네스를
+개발하고 내보내기 위한 경로다. 설치물은 exporter가 만든다.
 
-대상 프로젝트의 파일은 덮어쓰지 않는다. `requirements.txt`가 이미 있으면 하네스의 의존성
-목록은 `requirements-harness.txt`처럼 다른 이름으로 가져와 검증 도구만 설치한다. 기존
-가상환경과 pytest 설정, `.claude/wiki/`에 이미 있는 기록도 그대로 둔다.
+```text
+python .claude/harness/scripts/export_template.py --dest C:\workspace\harness-core
+```
+
+기본 출력은 **공통 구성만** 담은 새 디렉터리다. RAG 구성이나 면접 구성이 필요하면
+`--pack rag`, `--pack interview`를 함께 준다. `--dest`는 없는 경로여야 하고 기존 디렉터리는
+거부한다 — 이 CLI는 기존 프로젝트를 고치지 않는다.
+
+그다음 **출력 디렉터리에서 대상 프로젝트로 사람이 옮긴다.** 새 프로젝트면 내용을 그대로
+쓰고, 이미 `CLAUDE.md`·`AGENTS.md`·`.claude/settings.json`이 있으면 덮어쓰지 말고 규칙과
+`hooks` 항목을 병합한다. 병합 방법은 출력의 `HARNESS-INSTALL.md`가 소유한다.
+
+출력에는 `requirements.txt`가 없다. `pytest`·`ruff`는 **이 저장소를 검증하는** 도구이고
+대상 프로젝트의 필수 의존성이 아니다. 설치물의 Quality Profile은 비활성으로 나가며,
+프로젝트가 자기 언어의 도구로 채운다.
 
 ### 적용 직후 고칠 네 곳
 
 1. `CLAUDE.md` — 프로젝트 목적과 항상 지켜야 할 공통 규칙
-2. `.claude/harness.json` — 추적 경로, Fast 매핑, Quality Profile. 이 저장소의 사본은
-   **하네스 자신을 개발하는 설정**이라 매핑이 `.claude/harness/` → `tests/`를 가리킨다.
-   대상 프로젝트에서는 그 값을 자기 소스·테스트 경로로 바꾼다
+2. `.claude/harness.json` — 추적 경로, Fast 매핑, Quality Profile. 설치물은 **비활성**
+   상태로 나간다. 트리거와 stage가 비어 있어 아무 검사도 돌지 않으며, 그 상태에서
+   `run_quality.py --profile full`은 설정 결함으로 끝난다. 프로젝트의 소스·테스트 경로와
+   명령을 채워 활성화한다
 3. `.claude/wiki/overview/` — 디렉터리, 진입점, 관련 문서 링크
 4. `.claude/wiki/knowledge/` — 현재 유효한 계약과 정책
+
+절차 전체는 출력의 `HARNESS-INSTALL.md`에 있다. 이 README는 **소스 저장소의 문서**이고
+출력에 포함되지 않으므로, 설치물에서 이 파일을 참조하지 않는다.
 
 Claude Code는 프로젝트의 `.claude/settings.json`에서 훅을,
 `.claude/skills/<이름>/SKILL.md`에서 프로젝트 스킬을 읽는다.
@@ -109,17 +124,27 @@ python .claude/harness/scripts/doctor.py
 
 ### 무엇이 따라오고 무엇이 안 따라오는가
 
-| 가져온다 | 가져오지 않는다 |
-|---|---|
-| `CLAUDE.md`·`AGENTS.md` 진입점 | `.venv/`와 설치된 패키지 — 프로젝트마다 다시 만든다 |
-| `.claude/` 전체 — 설정·훅·스킬·Wiki 구조 | `.agents/`·`.codex/` — 다른 에이전트용 로컬 사본 |
-| `requirements.txt` — 하네스의 검증 도구 목록 | 하네스를 개발하며 쌓인 Plan·Task·Verify 기록 |
-| `tasks/_template.md` — 작업 명세 템플릿 | 끝난 작업의 임시 명세와 리뷰 |
-| `.claude/wiki/knowledge/`의 현재 계약 | 대상 프로젝트에 이미 있는 파일 |
+**기준은 `templates/manifest.json`이다.** 아래는 그 분류의 요약이고 실제 목록은 manifest가
+소유한다 — exporter는 manifest에 적힌 파일만 복사한다.
 
-`requirements.txt`의 `pytest`·`ruff`는 **이 저장소를 개발하고 검증하는** 도구다. 대상
-프로젝트의 제품 의존성도 아니고, 모든 프로젝트가 꼭 써야 하는 품질 도구도 아니다. 다른
-언어 프로젝트는 `.claude/harness.json`의 Quality Profile을 그 언어의 도구로 바꾼다.
+| 출력에 들어간다 | 소스에만 둔다 |
+|---|---|
+| 배포용 `CLAUDE.md`·`AGENTS.md` (`templates/core/`에서 생성) | 개발용 `CLAUDE.md`·`AGENTS.md` |
+| 배포용 `.gitignore`와 `HARNESS-INSTALL.md` | 이 `README.md`와 `.gitattributes` |
+| 공용 `settings.json`, 훅 전체, 스키마, Doctor, 수동 Quality CLI | `tests/`, CI 워크플로, `requirements.txt`, `ruff.toml` |
+| 공통 스킬 7개와 openwork 수집기 | `packs/`·`templates/` 자체와 exporter |
+| **비활성** `.claude/harness.json` (`templates/core/harness.json`에서 생성) | 개발용 `.claude/harness.json` |
+| Knowledge 3문서·배포 README와 비어 있는 History 세 폴더 | 하네스를 개발하며 쌓인 기록, `template-deploy.md`·`template-layout.md` |
+| `tasks/_template.md` | 끝난 작업의 임시 명세와 리뷰 |
+| `--pack`으로 고른 RAG·면접 구성 | 고르지 않은 구성, `.venv/`, `.agents/`·`.codex/` |
+
+`.claude/` **전체가 따라오지 않는다.** 설치물의 `.claude/harness.json`과 Knowledge 두 문서는
+개발용 원본이 아니라 `templates/core/`의 배포용 템플릿에서 만든다. 두 소스가 같은 출력
+경로를 차지하지 않는 것이 manifest의 계약이다.
+
+`requirements.txt`도 따라오지 않는다. 그 안의 `pytest`·`ruff`는 **이 저장소를 개발하고
+검증하는** 도구이고, 대상 프로젝트의 제품 의존성도 모든 프로젝트가 꼭 써야 하는 품질
+도구도 아니다. 다른 언어 프로젝트는 설치 후 Quality Profile을 그 언어의 도구로 채운다.
 
 History를 `.gitignore`로 막지 않는다. 비어 있는 것은 초기 상태이고, 기록을 남기지 않는
 정책이 아니다.
@@ -136,18 +161,32 @@ Full Quality Profile을 직접 실행한다.
 
 ## 구조
 
+**개발 소스**다. 이 트리가 곧 설치물은 아니다.
+
 ```text
-AGENTS.md                Codex용 최소 규칙과 Context Router
-CLAUDE.md                최소 공통 규칙과 Context Router
-.claude/settings.json    프로젝트 공용 훅 설정
-.claude/harness.json     프로젝트별 품질·History 설정
-.claude/skills/          필요할 때만 로드되는 작업 절차
-.claude/harness/         훅·보조 스크립트·설정 스키마
+AGENTS.md                Codex용 최소 규칙과 Context Router (개발용)
+CLAUDE.md                최소 공통 규칙과 Context Router (개발용)
+.claude/settings.json    프로젝트 공용 훅 설정 — 출력에도 그대로 간다
+.claude/harness.json     이 저장소를 개발하는 품질·History 설정
+.claude/skills/          공통 작업 절차 7개 — 출력에도 그대로 간다
+.claude/harness/         훅·보조 스크립트·설정 스키마·exporter
 .claude/wiki/            프로젝트 지식
 ├─ overview/             어디에 무엇이 있는가
 ├─ knowledge/            현재 무엇이 참인가
-└─ history/              왜 그렇게 되었는가
+└─ history/              왜 그렇게 되었는가 (출력에서 제외)
+packs/                   선택 구성의 원본 — `--pack`으로 고를 때만 출력
+├─ rag/                  RAG 에이전트 4개와 스킬 4개
+└─ interview/            quiz 스킬과 quiz Python 패키지
+templates/               배포 템플릿과 내보내기 목록
+├─ core/                 설치물의 진입점·설정·설치 안내·배포 Knowledge
+└─ manifest.json         source → destination 목록. 복사 목록의 유일한 소유자
+tests/                   이 저장소의 테스트 (출력에서 제외)
 ```
+
+**출력 트리**는 위와 다르다. `packs/`·`templates/`·`tests/`·exporter가 없고, 대신
+`HARNESS-INSTALL.md`와 비활성 `.claude/harness.json`이 있다. 설치물에서 무엇이 어디
+있는지는 출력의 `.claude/wiki/overview/README.md`가 안내한다. 내보내기 계약 자체는
+`.claude/wiki/knowledge/template-layout.md`에 있다 — **소스 전용 문서**다.
 
 `CLAUDE.md`는 상세 지식 저장소가 아니라 문서 탐색 경로를 제공하는 짧은 라우터다. 작업자는
 먼저 Overview를 보고, 관련 Knowledge만 읽으며, 과거의 결정 이유가 필요할 때만 History를

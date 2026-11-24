@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "core": [
+    { "source": "templates/core/CLAUDE.md", "destination": "CLAUDE.md" },
+    { "source": "templates/core/AGENTS.md", "destination": "AGENTS.md" },
+    { "source": "templates/core/gitignore", "destination": ".gitignore" },
+    { "source": "templates/core/INSTALL.md", "destination": "HARNESS-INSTALL.md" },
+    { "source": "tasks/_template.md", "destination": "tasks/_template.md" },
+    { "source": "templates/core/harness.json", "destination": ".claude/harness.json" },
+    { "source": ".claude/settings.json", "destination": ".claude/settings.json" },
+
+    { "source": ".claude/harness/hooks/_hookutil.py", "destination": ".claude/harness/hooks/_hookutil.py" },
+    { "source": ".claude/harness/hooks/_quality.py", "destination": ".claude/harness/hooks/_quality.py" },
+    { "source": ".claude/harness/hooks/auto_test_check.py", "destination": ".claude/harness/hooks/auto_test_check.py" },
+    { "source": ".claude/harness/hooks/heredoc_write_check.py", "destination": ".claude/harness/hooks/heredoc_write_check.py" },
+    { "source": ".claude/harness/hooks/history_check.py", "destination": ".claude/harness/hooks/history_check.py" },
+    { "source": ".claude/harness/hooks/paid_test_check.py", "destination": ".claude/harness/hooks/paid_test_check.py" },
+    { "source": ".claude/harness/hooks/plan_interview_check.py", "destination": ".claude/harness/hooks/plan_interview_check.py" },
+    { "source": ".claude/harness/hooks/plan_log_check.py", "destination": ".claude/harness/hooks/plan_log_check.py" },
+    { "source": ".claude/harness/hooks/pre_commit_check.py", "destination": ".claude/harness/hooks/pre_commit_check.py" },
+    { "source": ".claude/harness/hooks/prose_style_check.py", "destination": ".claude/harness/hooks/prose_style_check.py" },
+    { "source": ".claude/harness/hooks/task_log_check.py", "destination": ".claude/harness/hooks/task_log_check.py" },
+
+    { "source": ".claude/harness/schemas/harness.schema.json", "destination": ".claude/harness/schemas/harness.schema.json" },
+    { "source": ".claude/harness/scripts/doctor.py", "destination": ".claude/harness/scripts/doctor.py" },
+    { "source": ".claude/harness/scripts/run_quality.py", "destination": ".claude/harness/scripts/run_quality.py" },
+    { "source": ".claude/harness/scripts/openwork/__init__.py", "destination": ".claude/harness/scripts/openwork/__init__.py" },
+    { "source": ".claude/harness/scripts/openwork/collect.py", "destination": ".claude/harness/scripts/openwork/collect.py" },
+
+    { "source": ".claude/skills/handoff/SKILL.md", "destination": ".claude/skills/handoff/SKILL.md" },
+    { "source": ".claude/skills/history-significance/SKILL.md", "destination": ".claude/skills/history-significance/SKILL.md" },
+    { "source": ".claude/skills/openwork/SKILL.md", "destination": ".claude/skills/openwork/SKILL.md" },
+    { "source": ".claude/skills/plan-interview/SKILL.md", "destination": ".claude/skills/plan-interview/SKILL.md" },
+    { "source": ".claude/skills/plan-log/SKILL.md", "destination": ".claude/skills/plan-log/SKILL.md" },
+    { "source": ".claude/skills/task-log/SKILL.md", "destination": ".claude/skills/task-log/SKILL.md" },
+    { "source": ".claude/skills/verify-log/SKILL.md", "destination": ".claude/skills/verify-log/SKILL.md" },
+
+    { "source": "templates/core/overview/README.md", "destination": ".claude/wiki/overview/README.md" },
+    { "source": "templates/core/knowledge/README.md", "destination": ".claude/wiki/knowledge/README.md" },
+    { "source": "templates/core/knowledge/doctor.md", "destination": ".claude/wiki/knowledge/doctor.md" },
+    { "source": "templates/core/knowledge/quality-env.md", "destination": ".claude/wiki/knowledge/quality-env.md" },
+    { "source": ".claude/wiki/knowledge/paid-test-approval.md", "destination": ".claude/wiki/knowledge/paid-test-approval.md" },
+    { "source": "templates/core/history/README.md", "destination": ".claude/wiki/history/README.md" },
+    { "source": ".claude/wiki/history/plan/.gitkeep", "destination": ".claude/wiki/history/plan/.gitkeep" },
+    { "source": ".claude/wiki/history/task/.gitkeep", "destination": ".claude/wiki/history/task/.gitkeep" },
+    { "source": ".claude/wiki/history/verify/.gitkeep", "destination": ".claude/wiki/history/verify/.gitkeep" }
+  ],
+  "packs": {
+    "rag": [
+      { "source": "packs/rag/.claude/agents/code-reviewer.md", "destination": ".claude/agents/code-reviewer.md" },
+      { "source": "packs/rag/.claude/agents/ingestion-specialist.md", "destination": ".claude/agents/ingestion-specialist.md" },
+      { "source": "packs/rag/.claude/agents/rag-evaluator.md", "destination": ".claude/agents/rag-evaluator.md" },
+      { "source": "packs/rag/.claude/agents/retrieval-specialist.md", "destination": ".claude/agents/retrieval-specialist.md" },
+      { "source": "packs/rag/.claude/skills/code-tracker/SKILL.md", "destination": ".claude/skills/code-tracker/SKILL.md" },
+      { "source": "packs/rag/.claude/skills/code-tracker/template.html", "destination": ".claude/skills/code-tracker/template.html" },
+      { "source": "packs/rag/.claude/skills/document-ingestion/SKILL.md", "destination": ".claude/skills/document-ingestion/SKILL.md" },
+      { "source": "packs/rag/.claude/skills/rag-code-review/SKILL.md", "destination": ".claude/skills/rag-code-review/SKILL.md" },
+      { "source": "packs/rag/.claude/skills/regression-test/SKILL.md", "destination": ".claude/skills/regression-test/SKILL.md" }
+    ],
+    "interview": [
+      { "source": "packs/interview/.claude/skills/quiz/SKILL.md", "destination": ".claude/skills/quiz/SKILL.md" },
+      { "source": "packs/interview/.claude/harness/scripts/quiz/__init__.py", "destination": ".claude/harness/scripts/quiz/__init__.py" },
+      { "source": "packs/interview/.claude/harness/scripts/quiz/collect.py", "destination": ".claude/harness/scripts/quiz/collect.py" },
+      { "source": "packs/interview/.claude/harness/scripts/quiz/log.py", "destination": ".claude/harness/scripts/quiz/log.py" }
+    ]
+  }
+}
