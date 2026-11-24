@@ -14,12 +14,18 @@ Windows에서 `os.symlink`는 권한을 요구하고 junction(`mklink /J`)은 �
 
 같은 체크아웃, 같은 머신에서 두 세션의 결과가 갈렸다.
 
-| 세션 | `os.symlink` | `mklink /J` | Full |
+| 환경 | symlink 셋(3) | junction 셋(3) | Full |
 |---|---|---|---|
-| A (Claude) | WinError 1314 거부 | **종료 0**, 생성됨 | 851 passed · 5 skipped |
-| B (Codex) | (같은 제한) | **종료 1**, `Access is denied.` | 848 passed · 8 skipped |
+| 로컬 A (Claude) | skip — WinError 1314 | **실행** | 851 passed · 5 skipped |
+| 로컬 B (Codex) | skip — 같은 제한 | skip — `Access is denied.` | 848 passed · 8 skipped |
+| CI `ubuntu-latest` | **실행** | skip — 비해당 | 852 passed · 4 skipped |
+| CI `windows-latest` | **실행** | **실행** | 854 passed · 2 skipped |
 
-총 테스트 수는 **856으로 같고**, 차이 셋은 실제 junction을 쓰는 실행 검사다.
+총 테스트 수는 네 환경 모두 **856으로 같다.** 차이는 전부 링크 capability와 OS 전용 분기로
+설명된다. 같은 머신의 두 세션이 갈렸고(junction), 같은 OS의 로컬과 CI도 갈렸다(symlink).
+
+**CI `windows-latest`가 두 종류를 한 환경에서 모두 실행했다**(run 45426067451, `9632b25`).
+남은 skip 둘은 이전부터 있던 POSIX 전용 분기이고 capability 실패가 아니다.
 
 **세션 A에서는 위치를 바꿔도 결과가 같았다** — 저장소 루트, `TEMP`(`%LOCALAPPDATA%\Temp`),
 `TMPDIR`(`...\CreatorTemp`), scratchpad 네 자리 모두 종료 0으로 junction을 만들었다. 이것은
@@ -62,11 +68,15 @@ Windows에서 `os.symlink`는 권한을 요구하고 junction(`mklink /J`)은 �
 ## 재발 방지와 남은 제약
 
 - 테스트는 두 capability를 따로 probe하고, skip 사유에 실제 예외·종료 코드를 담는다.
-- **실제 symlink 거부는 아직 어느 환경에서도 실행되지 않았다.** hosted CI의 Linux가 그
-  자리이고, 거기서는 junction 쪽이 비해당으로 skip된다. **두 종류를 한 환경에서 모두
-  검증한 기록은 없다.**
-- CI가 초록이어도 skip 사유를 보지 않으면 「검사가 있는 줄 알았는데 없는」 상태와 구분되지
-  않는다. 이 저장소가 훅마다 두려워한 그 상태다.
+- **실제 거부는 두 종류 다 CI에서 실행됐다**(위 표). 로컬에서 skip되는 것은 그 환경의
+  생성 제한이고, 거부 계약 자체의 미검증이 아니다. 그래서 **로컬 skip을 결함으로 읽지
+  않되, 로컬 통과를 거부 계약의 근거로도 쓰지 않는다.**
+- **남은 제약**: 어느 종류가 어디서 되는지는 여전히 보장할 수 없다. 같은 머신의 두 세션이
+  junction에서 갈렸고, 그 기전은 미확인이다. CI 런너의 권한 구성이 바뀌면 같은 테스트가
+  조용히 skip될 수 있다.
+- 그래서 CI가 초록인 것으로 끝내지 않고 **skip 사유를 본다.** 보지 않으면 「검사가 있는 줄
+  알았는데 없는」 상태와 구분되지 않는다 — 이 저장소가 훅마다 두려워한 그 상태다.
+  Full의 pytest에 `-rs`를 둔 이유가 이것이고, 이번에 그 출력으로 판정했다.
 
 ## Knowledge 반영
 

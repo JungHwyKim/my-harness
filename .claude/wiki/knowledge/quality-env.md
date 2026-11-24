@@ -172,6 +172,14 @@ CI 게이트가 꺼지면 그건 검사가 아니다. 출력 머리에도 같은
 | Hosted CI / Windows | 같은 단계 성공. **762 passed · 1 skipped / 23.37초**, format 75 files | 같은 실행과 보고 커밋. Windows 최초 실패의 출력 인코딩 수정은 `0e52390` |
 | Hosted CI / Ubuntu (venv guard 적용 후) | 성공. **768 passed · 1 skipped / 10.41초**. 고른 인터프리터가 `/home/runner/work/my-harness/my-harness/.venv/bin/python`으로 보고됐다 | 2026-11-22, Claude가 [run 45043697211](https://github.com/JungHwyKim/my-harness/actions/runs/45043697211)의 job 로그에서 확인. 실행 코드 `7c540cb` |
 | Hosted CI / Windows (venv guard 적용 후) | 성공. **767 passed · 2 skipped / 26.76초**. `D:\a\my-harness\my-harness\.venv\Scripts\python.exe` | 같은 실행. skip 수가 OS마다 다른 것은 아래 설명대로다 |
+| Hosted CI / Ubuntu (pack 분리 후) | 성공. **852 passed · 4 skipped / 13.76초**. skip은 Windows 전용 분기 하나와 junction 셋(비해당) | 2026-11-25, Claude가 [run 45426067451](https://github.com/JungHwyKim/my-harness/actions/runs/45426067451)의 job 로그에서 확인. 실행 코드 `9632b25` |
+| Hosted CI / Windows (pack 분리 후) | 성공. **854 passed · 2 skipped / 19.56초**. skip은 POSIX 전용 둘뿐이고, **symlink·junction 거부가 둘 다 실행됐다** | 같은 실행. 로컬보다 빠르다 — 로컬은 같은 856건을 38.97~65.15초에 돌렸다 |
+
+위 두 행의 **근거는 Claude가 읽은 job 로그 하나다.** Codex는 같은 실행을
+`gh run view 45426067451`로 다시 조회하려다 `api.github.com` 연결 오류로 실패했고, 실행
+페이지 접근도 안 됐다(2026-11-25). 그래서 이 수치에는 **독립 재조회가 없다.** 다시 확인할
+때는 위 링크의 job 로그를 직접 열고, `-rs`가 남긴 테스트별 skip 사유를 테스트 정의와
+대조한다 — 건수만 맞추는 것으로는 capability 실패와 비해당 skip이 구분되지 않는다.
 
 **`--require-venv` 도입 전 Linux job은 고른 경로를 기반 Python으로 보고했다** —
 `/opt/hostedtoolcache/Python/3.12.16/x64/bin/python3.12`. 같은 실행의 Windows는 `.venv`

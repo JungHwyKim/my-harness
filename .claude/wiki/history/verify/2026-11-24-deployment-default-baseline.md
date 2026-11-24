@@ -57,8 +57,9 @@ Windows 11, Python 3.12.5, 소스 저장소의 `.venv` 인터프리터로 실행
 - **설치물에서 훅이 실제로 도는지는 재지 않았다.** Doctor는 명령을 실행하지 않고, 훅은
   Claude Code 세션 안에서만 돈다. 결선 PASS는 「연결이 있다」까지다.
 - `run_quality.py`를 소스 venv로 불렀으므로 **설치물의 인터프리터 선택은 미검증**이다.
-  설치물에 `.venv`를 만들어 재는 것은 통합 설치 검증(`tasks/template-install-smoke.md`)의
-  몫이다.
+  설치물에 `.venv`를 만들어 재는 것은 **통합 설치 검증 작업**의 몫이다. 그 작업의 임시
+  명세는 현재 `tasks/template-install-smoke.md`지만, 임시 파일이므로 끝나면 사라진다 —
+  남는 경계는 「exporter까지가 이 작업, 설치물 실행은 그 작업」이다.
 - 두 OS 중 **Windows만** 쟀다. hosted CI는 소스 저장소를 돌리고 설치물을 만들지 않는다.
 - 활성화한 뒤의 Doctor(WARN이 사라지고 결선 검사가 도는 상태)는 재지 않았다.
 

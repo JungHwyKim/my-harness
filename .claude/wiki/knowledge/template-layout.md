@@ -112,6 +112,12 @@ quiz는 **프로젝트에 설치하는 선택 구성**이다. 연습은 `--pack 
 ## 보장하지 않는 것
 
 - exporter는 **파일 복사**까지다. 출력물이 실제로 동작하는지는 설치 검증이 따로 본다.
+  구체적으로 **설치된 프로젝트 자신의 인터프리터 선택과 세션 훅의 실제 실행은 미검증**이고,
+  그 통합 검증은 별도의 설치 smoke 작업이 소유한다.
+- 이 계약은 **`9632b25`에 구현돼 있고 두 OS hosted CI로 검증됐다**(run 45426067451 — Ubuntu
+  852 passed · 4 skipped, Windows 854 passed · 2 skipped). 거부 계약이 양쪽에서 실제로
+  실행됐고 Windows에서는 symlink·junction 두 종류가 모두 돌았다. 그 수치의 근거와
+  **독립 재조회가 없다는 한계**는 [quality-env.md](quality-env.md)의 CI 행에 있다.
 - 대상 프로젝트와의 병합은 문서로만 안내한다. 자동 병합·덮어쓰기·배포 ref 발행은 없다.
 - 배포 ref(`template/*`)와 이 내보내기 절차는 **다른 것**이다.
   [template-deploy.md](template-deploy.md)가 그 구분을 소유한다.
