@@ -177,11 +177,13 @@ CI 게이트가 꺼지면 그건 검사가 아니다. 출력 머리에도 같은
 | Hosted CI / Ubuntu (설치 검증 추가 후) | 성공. **872 passed · 4 skipped / 16.01초** → 수정 후 **874 passed · 4 skipped / 12.14초** | 2026-11-25, Claude가 [run 45609249573](https://github.com/JungHwyKim/my-harness/actions/runs/45609249573)·[run 45613723220](https://github.com/JungHwyKim/my-harness/actions/runs/45613723220)의 job 로그에서 확인. 실행 코드 `2048015`·`2f88ff0` |
 | Hosted CI / Windows (설치 검증 추가 후) | 성공. **874 passed · 2 skipped / 35.47초** → 수정 후 **876 passed · 2 skipped / 36.55초**. 설치 검증 22개가 **양쪽에서 모두 실행됐다**(이 파일이 추가한 skip 없음) | 같은 두 실행. 20개 추가의 비용은 **Windows 에서만 분명하다**(+15.91초). Ubuntu 의 +2.25초는 자기 흩어짐(3.87초) 안이라 측정되지 않았다 — `history/verify/2026-11-25-install-copy-execution-baseline.md` |
 
-위 두 행의 **근거는 Claude가 읽은 job 로그 하나다.** Codex는 같은 실행을
-`gh run view 45426067451`로 다시 조회하려다 `api.github.com` 연결 오류로 실패했고, 실행
-페이지 접근도 안 됐다(2026-11-25). 그래서 이 수치에는 **독립 재조회가 없다.** 다시 확인할
-때는 위 링크의 job 로그를 직접 열고, `-rs`가 남긴 테스트별 skip 사유를 테스트 정의와
-대조한다 — 건수만 맞추는 것으로는 capability 실패와 비해당 skip이 구분되지 않는다.
+**위 2026-11-24~25 네 행(pack 분리·설치 검증)의 근거는 모두 Claude가 읽은 job 로그 하나씩이고
+독립 재조회가 없다.** Codex는 `gh run view`로 45426067451·45613723220을 다시 조회하려다
+`api.github.com` 연결 오류로 실패했고 실행 페이지 접근도 안 됐다(2026-11-25). 코드·설정이
+해당 리비전과 일치하는지는 직접 확인했으나, **수치 자체의 두 번째 출처는 없다.**
+
+다시 확인할 때는 위 링크의 job 로그를 직접 열고, `-rs`가 남긴 **테스트별 skip 사유**를 테스트
+정의와 대조한다 — 건수만 맞추는 것으로는 capability 실패와 비해당 skip이 구분되지 않는다.
 
 **`--require-venv` 도입 전 Linux job은 고른 경로를 기반 Python으로 보고했다** —
 `/opt/hostedtoolcache/Python/3.12.16/x64/bin/python3.12`. 같은 실행의 Windows는 `.venv`

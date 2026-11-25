@@ -1,9 +1,12 @@
 # 배포 사본에서 엔진·훅·수집기를 실제로 돌린 첫 실측
 
 - 날짜: 2026-11-25
-- 대상: **`main / 2048015`** — `tests/test_template_install.py`. exporter 출력물 안에서
-  Doctor·Quality 엔진·훅·수집기를 실행한 결과. 두 OS hosted CI는
-  [run 45609249573](https://github.com/JungHwyKim/my-harness/actions/runs/45609249573)
+- 대상: **`main / 2f88ff0`** — `tests/test_template_install.py` 22개. exporter 출력물 안에서
+  Doctor·Quality 엔진·훅·수집기를 실행한 결과. 첫 20개는 `2048015`였고 두 리비전의 두 OS
+  hosted CI는 아래 표에 있다. 뒤따르는 `ecee636`·`3ada5b7`은 **기록만 바꾼 커밋**이므로
+  검증된 실행 코드와 구분한다
+- 상태: **구현 완료.** Codex 최종 결과 리뷰를 통과했고 명세의 완료 기준 아홉 개가 충족됐다
+  (2026-11-25). 아래 「한계」의 비목표는 그 판정에 포함된 **명시한 미검증**이다
 - 비교 기준: `2026-11-24-deployment-default-baseline.md`. 그 기록은 **정적 진단**(Doctor 종료
   0, 빈 Full 종료 2)까지였고 「훅이 실제로 도는지」·「인터프리터 선택」을 미검증으로 남겼다
 - 판정: 개선 — 그 두 미검증 항목이 닫혔다. 새 baseline 이다
@@ -105,8 +108,10 @@ skip 되면 미완료라는 기준을 이로써 충족한다.
 
 ## 한계와 재지 못한 것
 
-- **로컬 측정은 Windows 한 환경, 한 세션이다.** Linux 는 위 CI 가 쟀고, 그 로그의 수치는
-  Claude 가 읽은 job 로그 하나에 근거한다.
+- **로컬 측정은 Windows 한 환경, 한 세션이다.** Linux 는 위 CI 가 쟀다.
+- **CI 수치에 두 번째 출처가 없다.** 모두 Claude 가 읽은 job 로그 하나씩이고, Codex 의
+  `gh run view` 독립 재조회는 `api.github.com` 연결 오류로 실패했다(2026-11-25). 코드·설정이
+  그 리비전과 일치하는지는 양쪽이 확인했지만 **수치 자체는 재조회되지 않았다.**
 - **실제 세션의 이벤트 전달과 신뢰 승인은 검증하지 않았다.** 합성 payload 를 훅에 직접
   넘긴 것이고, Claude Code·Codex 가 그 payload 를 보낸다는 사실은 이 검증의 범위가 아니다.
 - **누출 재현에 실제 소스 저장소를 쓰지 않았다.** 엉뚱한 환경변수 검사는 decoy 프로젝트를
