@@ -111,9 +111,15 @@ quiz는 **프로젝트에 설치하는 선택 구성**이다. 연습은 `--pack 
 
 ## 보장하지 않는 것
 
-- exporter는 **파일 복사**까지다. 출력물이 실제로 동작하는지는 설치 검증이 따로 본다.
-  구체적으로 **설치된 프로젝트 자신의 인터프리터 선택과 세션 훅의 실제 실행은 미검증**이고,
-  그 통합 검증은 별도의 설치 smoke 작업이 소유한다.
+- exporter는 **파일 복사**까지다. 출력물이 실제로 도는지는 `tests/test_template_install.py`가
+  사본 안에서 Doctor·Quality 엔진·훅·수집기를 실행해 따로 본다
+  (`history/verify/2026-11-25-install-copy-execution-baseline.md`).
+- 그래도 **남는 미검증 두 가지**: 실제 Claude/Codex 세션이 훅에 이벤트를 전달하고 신뢰를
+  승인하는 경로(위 검증은 합성 payload를 직접 넘긴다), 그리고 설치 프로젝트가 **자기 `.venv`를
+  만들어 쓰는 경로**(위 검증은 `python` 설정 키로 인터프리터를 지정한다).
+- **루트 해석이 세 갈래다.** `doctor.py`·`run_quality.py`는 자기 배치로, 훅은
+  `CLAUDE_PROJECT_DIR`→cwd로, `openwork/collect.py`는 환경→cwd로 정하며 **자기 배치 fallback이
+  없다.** 설치물에서 무언가를 실행하는 코드는 이 차이를 전제해야 한다.
 - 이 계약은 **`9632b25`에 구현돼 있고 두 OS hosted CI로 검증됐다**(run 45426067451 — Ubuntu
   852 passed · 4 skipped, Windows 854 passed · 2 skipped). 거부 계약이 양쪽에서 실제로
   실행됐고 Windows에서는 symlink·junction 두 종류가 모두 돌았다. 그 수치의 근거와
