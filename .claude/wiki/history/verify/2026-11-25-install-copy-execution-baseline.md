@@ -1,8 +1,9 @@
 # 배포 사본에서 엔진·훅·수집기를 실제로 돌린 첫 실측
 
 - 날짜: 2026-11-25
-- 대상: `main / 9c2116c` 작업 트리 + `tests/test_template_install.py`(**미커밋**).
-  exporter 출력물 안에서 Doctor·Quality 엔진·훅·수집기를 실행한 결과
+- 대상: **`main / 2048015`** — `tests/test_template_install.py`. exporter 출력물 안에서
+  Doctor·Quality 엔진·훅·수집기를 실행한 결과. 두 OS hosted CI는
+  [run 45609249573](https://github.com/JungHwyKim/my-harness/actions/runs/45609249573)
 - 비교 기준: `2026-11-24-deployment-default-baseline.md`. 그 기록은 **정적 진단**(Doctor 종료
   0, 빈 Full 종료 2)까지였고 「훅이 실제로 도는지」·「인터프리터 선택」을 미검증으로 남겼다
 - 판정: 개선 — 그 두 미검증 항목이 닫혔다. 새 baseline 이다
@@ -63,10 +64,28 @@ Windows 11, Python 3.12.5, `pytest 9.2.0`, 저장소의 `.venv`. 모든 사본�
 | 훅 | `CLAUDE_PROJECT_DIR` → cwd. `_hookutil.PROJECT_ROOT` 는 **import 때** 정해진다 |
 | `openwork/collect.py` | 환경 → cwd. **자기 배치 fallback 이 없다** — 둘 다 어긋나면 종료 2 |
 
+## 두 OS CI — 20개가 모두 양쪽에서 돌았다
+
+| 환경 | Full pytest | skip 사유 |
+|---|---|---|
+| `ubuntu-latest` | **872 passed · 4 skipped / 16.01초** | Windows 전용 분기 하나, junction 셋(비해당) |
+| `windows-latest` | **874 passed · 2 skipped / 35.47초** | POSIX 전용 둘 |
+| 로컬 Windows | 871 passed · 5 skipped / 57.35초 | 위 둘 + symlink 셋(생성 권한) |
+
+세 환경 모두 총수 **876** 으로 맞는다. **이 파일이 추가한 skip 은 없다** — 어느 쪽 목록에도
+설치 검증 테스트가 없으므로 20개가 양쪽에서 실제로 실행됐다. 지원 대상 검사가 환경 부재로
+skip 되면 미완료라는 기준을 이로써 충족한다.
+
+**같은 20개의 비용이 OS 마다 크게 다르다.** 같은 커밋에서 테스트 수가 856 → 876 으로 늘 때
+Ubuntu 는 13.76 → 16.01초(**+2.25초**), Windows 는 19.56 → 35.47초(**+15.91초**)였다. 약
+**7배** 차이다. 이 파일은 테스트마다 subprocess 를 여러 개 띄우므로 프로세스 생성 비용이
+유력한 설명이지만, **그것만 떼어 재지 않았으므로 추정이다.** 숫자는 두 관측값이고 원인은
+후보다.
+
 ## 한계와 재지 못한 것
 
-- **Windows 한 환경, 한 세션이다.** Linux 는 hosted CI 가 잴 자리이고 아직 **미커밋**이라
-  돌지 않았다.
+- **로컬 측정은 Windows 한 환경, 한 세션이다.** Linux 는 위 CI 가 쟀고, 그 로그의 수치는
+  Claude 가 읽은 job 로그 하나에 근거한다.
 - **실제 세션의 이벤트 전달과 신뢰 승인은 검증하지 않았다.** 합성 payload 를 훅에 직접
   넘긴 것이고, Claude Code·Codex 가 그 payload 를 보낸다는 사실은 이 검증의 범위가 아니다.
 - **누출 재현에 실제 소스 저장소를 쓰지 않았다.** 엉뚱한 환경변수 검사는 decoy 프로젝트를

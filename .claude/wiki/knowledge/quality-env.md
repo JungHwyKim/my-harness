@@ -174,6 +174,8 @@ CI 게이트가 꺼지면 그건 검사가 아니다. 출력 머리에도 같은
 | Hosted CI / Windows (venv guard 적용 후) | 성공. **767 passed · 2 skipped / 26.76초**. `D:\a\my-harness\my-harness\.venv\Scripts\python.exe` | 같은 실행. skip 수가 OS마다 다른 것은 아래 설명대로다 |
 | Hosted CI / Ubuntu (pack 분리 후) | 성공. **852 passed · 4 skipped / 13.76초**. skip은 Windows 전용 분기 하나와 junction 셋(비해당) | 2026-11-25, Claude가 [run 45426067451](https://github.com/JungHwyKim/my-harness/actions/runs/45426067451)의 job 로그에서 확인. 실행 코드 `9632b25` |
 | Hosted CI / Windows (pack 분리 후) | 성공. **854 passed · 2 skipped / 19.56초**. skip은 POSIX 전용 둘뿐이고, **symlink·junction 거부가 둘 다 실행됐다** | 같은 실행. 로컬보다 빠르다 — 로컬은 같은 856건을 38.97~65.15초에 돌렸다 |
+| Hosted CI / Ubuntu (설치 검증 추가 후) | 성공. **872 passed · 4 skipped / 16.01초** | 2026-11-25, Claude가 [run 45609249573](https://github.com/JungHwyKim/my-harness/actions/runs/45609249573)의 job 로그에서 확인. 실행 코드 `2048015` |
+| Hosted CI / Windows (설치 검증 추가 후) | 성공. **874 passed · 2 skipped / 35.47초**. 설치 검증 20개가 **양쪽에서 모두 실행됐다**(이 파일이 추가한 skip 없음) | 같은 실행. 같은 20개의 비용이 Ubuntu +2.25초 · Windows +15.91초로 **약 7배** 다르다 — `history/verify/2026-11-25-install-copy-execution-baseline.md` |
 
 위 두 행의 **근거는 Claude가 읽은 job 로그 하나다.** Codex는 같은 실행을
 `gh run view 45426067451`로 다시 조회하려다 `api.github.com` 연결 오류로 실패했고, 실행
