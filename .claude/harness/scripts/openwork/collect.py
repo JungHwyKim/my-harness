@@ -652,7 +652,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--flat", action="store_true", help="접지 않고 항목을 그대로 낸다")
     parser.add_argument("--raw", action="store_true", help="불릿 원문도 싣는다 (기본은 뺀다)")
     parser.add_argument("--pretty", action="store_true", help="들여쓴 JSON (크기가 2배가 된다)")
-    parser.add_argument("--root", default=None, help="저장소 경로 (기본: 이 파일 기준)")
+    parser.add_argument(
+        "--root",
+        default=None,
+        # **「이 파일 기준」이 아니다.** `_find_root()` 는 `CLAUDE_PROJECT_DIR` 또는 cwd 에서
+        # 시작해 `.claude/` 를 찾아 올라간다 — 자기 배치는 보지 않는다. 내보낸 사본에서
+        # 이 수집기를 부를 때 그 차이가 드러나므로(실측 2026-11-25) 안내를 맞춘다
+        help="저장소 경로 (기본: CLAUDE_PROJECT_DIR 또는 현재 폴더에서 .claude/ 를 찾아 올라간다)",
+    )
     args = parser.parse_args(argv)
 
     try:

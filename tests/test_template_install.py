@@ -301,7 +301,8 @@ def _payload(copy: Path, session: str, target: Path) -> str:
     )
 
 
-def _wire_fast(copy: Path, script: Path, *, exit_code: int = 0) -> Path:
+def _wire_fast(copy: Path, script: Path) -> Path:
+    """매핑이 필요 없는 Fast. `{mapped_targets}` 를 쓰지 않으므로 추적만으로 실행된다."""
     target = copy / "tracked.txt"
     target.write_text("변경된 파일\n", encoding="utf-8")
     config = _config(copy)
@@ -313,6 +314,40 @@ def _wire_fast(copy: Path, script: Path, *, exit_code: int = 0) -> Path:
     }
     _write_config(copy, config)
     return target
+
+
+# **매핑을 실제로 설정하는 쪽이 본 검사다.** `{mapped_targets}` 를 쓰면 엔진이 매핑을
+# 요구하므로(`profile_uses` → `mapping_required`), 매핑이 없으면 추적된 파일조차
+# `CAUSE_UNMAPPED` 로 분류돼 훅이 **알림만 내고 stage 를 돌리지 않는다.** 그때 probe 는
+# 실행되지 않으므로 「돌았다」를 단언할 수 없다. 그래서 둘을 따로 둔다
+def _wire_mapped_fast(copy: Path, script: Path) -> tuple[Path, str]:
+    target = copy / "src" / "feature.py"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("x = 1\n", encoding="utf-8")
+    mapped = "checks/probe_target.py"
+    (copy / "checks").mkdir(exist_ok=True)
+    (copy / mapped).write_text("# 매핑 대상\n", encoding="utf-8")
+
+    config = _config(copy)
+    config["python"] = sys.executable
+    config["quality"]["tracked_paths"] = ["src/"]
+    config["quality"]["mappings"] = [
+        {"path": "src/", "tests": mapped, "why": "이 테스트의 매핑 대상"}
+    ]
+    config["quality"]["profiles"]["fast"] = {
+        "triggers": ["post_change"],
+        "stages": [
+            {
+                "id": "fast",
+                "label": "mapped probe",
+                "argv": ["{python}", str(script), "{mapped_targets}"],
+                "success_codes": [0],
+                "timeout": 60,
+            }
+        ],
+    }
+    _write_config(copy, config)
+    return target, mapped
 
 
 def test_post_tool_use_payload_runs_the_installed_probe(tmp_path: Path, core: Path) -> None:
@@ -329,6 +364,27 @@ def test_post_tool_use_payload_runs_the_installed_probe(tmp_path: Path, core: Pa
     assert done.returncode == 0, done.stdout + done.stderr
     assert trace.is_file(), "훅이 사본의 Profile 을 돌리지 않았습니다"
     seen = json.loads(trace.read_text(encoding="utf-8"))
+    assert Path(seen["cwd"]) == core
+    assert seen["argv"] == [], "매핑 없는 stage 에 인자가 붙었습니다"
+
+
+# 명세가 요구하는 「실제 추적/매핑 파일」과 「매핑 인자 확인」이 이 자리다. probe 가 받은
+# 인자를 **정확히** 단언하므로, 매핑 대상을 바꾸거나 매핑을 지우면 이 테스트가 깨진다
+def test_mapped_fast_passes_the_mapped_target_to_the_probe(tmp_path: Path, core: Path) -> None:
+    script, trace = _probe(tmp_path, "mapped")
+    target, mapped = _wire_mapped_fast(core, script)
+
+    done = _run(
+        core / AUTO_TEST_HOOK,
+        cwd=core,
+        env_extra=_hook_env(core, tmp_path, "mapped-session"),
+        stdin=_payload(core, "mapped-session", target),
+    )
+
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert trace.is_file(), "매핑된 Fast 가 실행되지 않았습니다"
+    seen = json.loads(trace.read_text(encoding="utf-8"))
+    assert seen["argv"] == [mapped], f"매핑 대상이 인자로 오지 않았습니다: {seen['argv']}"
     assert Path(seen["cwd"]) == core
 
 
@@ -440,6 +496,10 @@ def test_installed_openwork_reports_empty_then_collects_one(core: Path) -> None:
     assert filled.returncode == 0, filled.stdout + filled.stderr
     second = json.loads(filled.stdout)
 
+    # **채워진 결과의 root 도 본다.** 빈 결과에서만 보면, 항목을 읽은 쪽이 엉뚱한
+    # 프로젝트였어도 통과한다 — 실측으로 이 단언이 없을 때 `root` 를 바꿔치기해도
+    # 테스트가 초록이었다
+    assert Path(second["root"]) == core, f"항목을 읽은 프로젝트가 사본이 아닙니다: {second['root']}"
     assert len(second["items"]) == 1, json.dumps(second, ensure_ascii=False)[:600]
     body = json.dumps(second["items"], ensure_ascii=False)
     assert bullet in body, body
@@ -458,9 +518,10 @@ def test_installed_quiz_collects_known_counts(
     notes = tmp_path / "notes"
     notes.mkdir()
     first = "재순위화가 필요한 이유는?"
+    second = "벡터 인덱스의 trade-off 는?"
     (notes / "unit.md").write_text(
         f"# 면접 노트\n\n## Q. {first}\n\n재현율과 정확도가 갈린다.\n\n"
-        "## ★ Q. 벡터 인덱스의 trade-off 는?\n\n메모리와 지연의 교환이다.\n",
+        f"## ★ Q. {second}\n\n메모리와 지연의 교환이다.\n",
         encoding="utf-8",
     )
 
@@ -475,9 +536,58 @@ def test_installed_quiz_collects_known_counts(
     assert seen["counts"]["questions"] == 2, done.stdout[:400]
     assert seen["counts"]["starred"] == 1
     assert seen["selected"] == 2
-    texts = [item["question"] for item in seen["questions"]]
-    assert first in texts, texts
+    assert Path(seen["note_dir"]) == notes, "다른 노트 폴더를 읽었습니다"
+
+    # **두 질문을 다 본다.** 첫 질문만 단언하면 두 번째가 깨져도 통과한다 — 실측으로
+    # 두 번째 텍스트를 바꿔치기해도 초록이었다. 별표가 어느 질문에 붙었는지도 함께 본다
+    assert [(item["question"], item["starred"]) for item in seen["questions"]] == [
+        (first, False),
+        (second, True),
+    ], json.dumps(seen["questions"], ensure_ascii=False)[:600]
     assert {item["file"] for item in seen["questions"]} == {"unit"}
+
+
+# ───────────────── 공백·한글이 있는 프로젝트 경로 ─────────────────
+
+
+# 실행 계약이 요구하는 변형이다. 공백은 **인자 분해**를, 비ASCII 는 **인코딩**을 틀어뜨릴 수
+# 있고 둘 다 설치물에서만 드러난다. probe 스크립트 이름에도 공백을 넣어 stage argv 까지 본다.
+# 머신별 임시 경로나 사용자명에 기대지 않고 **이 테스트가 만든 이름**으로 검사한다
+def test_representative_scenarios_survive_a_space_and_hangul_path(tmp_path: Path) -> None:
+    copy = _export(tmp_path / "설치 사본")
+    assert " " in copy.name, "공백이 없으면 이 변형을 재는 것이 아니다"
+    assert not copy.name.isascii(), "비ASCII 가 없으면 이 변형을 재는 것이 아니다"
+
+    # 1) Doctor — 사본 설정을 읽는다
+    doctor = _run(copy / DOCTOR, cwd=copy)
+    assert doctor.returncode == 0, doctor.stdout + doctor.stderr
+    assert "D-PROFILE" in doctor.stdout + doctor.stderr
+
+    # 2) 설정한 Profile — 공백이 든 스크립트 경로로 실제 stage 를 돌린다
+    script, trace = _probe(tmp_path, "프로브 하나")
+    _configure_profile(copy, "full", [_stage("spaced", script, "--한글-인자")])
+    quality = _run(copy / RUN_QUALITY, "--profile", "full", cwd=copy)
+    assert quality.returncode == 0, quality.stdout + quality.stderr
+    seen = json.loads(trace.read_text(encoding="utf-8"))
+    assert Path(seen["cwd"]) == copy
+    assert seen["argv"] == ["--한글-인자"]
+
+    # 3) 합성 훅 — 매핑 인자가 공백 경로에서도 그대로 온다
+    hook_script, hook_trace = _probe(tmp_path, "훅 프로브")
+    target, mapped = _wire_mapped_fast(copy, hook_script)
+    hook = _run(
+        copy / AUTO_TEST_HOOK,
+        cwd=copy,
+        env_extra=_hook_env(copy, tmp_path, "spaced-session"),
+        stdin=_payload(copy, "spaced-session", target),
+    )
+    assert hook.returncode == 0, hook.stdout + hook.stderr
+    assert json.loads(hook_trace.read_text(encoding="utf-8"))["argv"] == [mapped]
+
+    # 4) 수집기 — `--root` 로 공백 경로를 넘긴다
+    work = _run(copy / OPENWORK, "--flat", "--root", str(copy), cwd=copy)
+    assert work.returncode == 0, work.stdout + work.stderr
+    assert Path(json.loads(work.stdout)["root"]) == copy
 
 
 # ─────────────────── 소스 import 경로 도움 없음 ───────────────────
